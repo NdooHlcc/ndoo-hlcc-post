@@ -3,10 +3,10 @@
    ========================================================= */
 
 const NDOO_CONTACT_LINKS = Object.freeze({
-  contact: '',
-  feedback: '',
-  report: '',
-  donate: ''
+  contact: 'https://wa.me/+6282228032167',
+  feedback: 'https://wa.me/+6282228032167',
+  report: 'https://wa.me/+6282228032167',
+  donate: 'https://wa.me/+6282228032167'
 });
 
 function formatBanUntil(ts) {
