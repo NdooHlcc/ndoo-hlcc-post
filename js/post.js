@@ -3,12 +3,14 @@
    ========================================================= */
 
 let postMediaData = null;
+let postMediaFile = null;
 let postMediaType = null;
 let editingPostId = null;
 let menuPostId = null;
 
 function resetPostComposer() {
   postMediaData = null;
+  postMediaFile = null;
   postMediaType = null;
   document.getElementById('postCaption').value = '';
   document.getElementById('postMedia').value = '';
@@ -44,6 +46,7 @@ document.getElementById('postMedia')?.addEventListener('change', async event => 
   msg.textContent = result.ok ? '' : result.message;
   if (!result.ok) return;
   try {
+    postMediaFile = file;
     postMediaData = await readFileAsDataURL(file);
     postMediaType = result.type;
     document.getElementById('postPreview').innerHTML = result.type === 'image'
@@ -78,10 +81,10 @@ document.getElementById('postSubmit')?.addEventListener('click', async () => {
       return;
     }
 
-    if (!postMediaData) { msg.textContent = 'Pilih foto/video dulu.'; return; }
+    if (!postMediaData || !postMediaFile) { msg.textContent = 'Pilih foto/video dulu.'; return; }
     if (vip && !isAdmin()) { msg.textContent = 'Hanya admin yang bisa posting VIP.'; return; }
 
-    await createOnlinePost({ caption, media: postMediaData, mediaType: postMediaType });
+    await createOnlinePost({ caption, media: postMediaData, mediaFile: postMediaFile, mediaType: postMediaType });
 
     msg.style.color = 'var(--accent2)';
     msg.textContent = 'Postingan berhasil diunggah!';
@@ -94,7 +97,7 @@ document.getElementById('postSubmit')?.addEventListener('click', async () => {
     }, 700);
   } catch (error) {
     console.error('Post gagal:', error);
-    msg.textContent = error?.name === 'QuotaExceededError' ? 'Penyimpanan perangkat penuh. Hapus data lama lalu coba lagi.' : 'Postingan gagal disimpan. Coba lagi.';
+    msg.textContent = formatUploadError(error, 'Postingan');
   } finally {
     if (button) button.disabled = false;
   }
