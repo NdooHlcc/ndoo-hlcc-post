@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>NdooHlcc Post</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<script src="https://js.puter.com/v2/"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- ============ AUTH PAGE (MUNCUL PERTAMA) ============ -->
+<div id="authPage" class="page auth-page">
+  <div class="auth-orb orb-a"></div><div class="auth-orb orb-b"></div>
+  <div class="auth-shell">
+    <div class="auth-brand"><div class="brand-mark">N</div><div><strong>NdooHlcc</strong><span>Social • Create • Connect</span></div></div>
+    <div class="auth-box">
+      <div class="auth-kicker">WELCOME BACK</div>
+      <h2 id="authTitle">Login</h2>
+      <p class="dev">Masuk dan lanjutkan aktivitasmu.</p>
+      <p class="msg" id="authMsg"></p>
+      <form id="authForm">
+        <label class="field-label" for="username">Username</label><input type="text" id="username" placeholder="Masukkan username" autocomplete="username" required>
+        <label class="field-label" for="password">Password</label><input type="password" id="password" placeholder="Masukkan password" autocomplete="current-password" required>
+        <button type="submit" id="authBtn">Masuk</button>
+      </form>
+      <p class="auth-note">Akunmu tersimpan online melalui Supabase.</p>
+      <div id="banPanel" class="ban-panel hidden">
+        <strong id="banPanelTitle">Akun dibatasi</strong>
+        <p id="banPanelReason"></p><small id="banPanelUntil"></small>
+        <textarea id="banAppealInput" rows="3" placeholder="Tulis alasan banding..."></textarea>
+        <button type="button" id="banAppealBtn">Kirim Banding</button>
+      </div>
+      <p id="switchText">Belum punya akun? <a href="#" id="switchBtn">Daftar</a></p>
+    </div>
+    <div class="auth-features"><span>✦ Feed</span><span>◉ Chat pribadi</span><span>♡ Story & post</span></div>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD PAGE (HIDDEN SAMPAI LOGIN) ============ -->
+<div id="uiToast" class="ui-toast hidden" role="status" aria-live="polite"></div>
+<div id="uiConfirm" class="ui-confirm hidden" role="dialog" aria-modal="true" aria-labelledby="uiConfirmText">
+  <div class="ui-confirm-card">
+    <p id="uiConfirmText"></p>
+    <div class="ui-confirm-actions"><button id="uiConfirmCancel" type="button">Batal</button><button id="uiConfirmOk" type="button">Lanjut</button></div>
+  </div>
+</div>
+
+<div id="dashPage" class="page hidden">
+  <header class="topbar">
+    <h1>NdooHlcc</h1>
+    <div class="topbar-right">
+      <button id="searchBtn" class="icon-btn" title="Cari">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.5 14h-.8l-.3-.3a6.5 6.5 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+      </button>
+      <button id="notifBtn" class="icon-btn" title="Notifikasi">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z"/></svg>
+        <span id="notifCount" class="badge hidden">0</span>
+      </button>
+      <button id="settingsBtn" class="icon-btn" title="Pengaturan" type="button">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19.4 13a7.8 7.8 0 0 0 .1-1 7.8 7.8 0 0 0-.1-1l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.8 7.8 0 0 0-.1 1 7.8 7.8 0 0 0 .1 1L4.5 14.6l2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.3-2.9a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5L19.4 13zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+      </button>
+      <button id="musicBtn" class="icon-btn music-top-btn" title="Musik" type="button">
+        <span aria-hidden="true">♫</span>
+      </button>
+      <button id="aiBtn" class="icon-btn ai-top-btn" title="AI NdooHlcc" type="button">
+        <span class="ai-spark">✦</span>
+      </button>
+      <button id="infoBtn" class="icon-btn info-top-btn" title="Info Admin" type="button">
+        <span aria-hidden="true">ⓘ</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- TAB HOME -->
+    <section id="tabPublic" class="tab-content">
+      <div class="home-profile-card" id="homeProfileCard">
+        <div class="home-profile-avatar" id="homeProfileAvatar">?</div>
+        <div class="home-profile-copy"><span class="eyebrow">SELAMAT DATANG</span><strong id="homeProfileName">Memuat profil...</strong><small id="homeProfileBio">Bagikan sesuatu hari ini.</small></div>
+        <button class="soft-btn" id="homeProfileBtn" type="button">Profil</button>
+      </div>
+      <div class="story-bar" id="storyBar"></div>
+      <div class="section-heading"><div><span class="eyebrow">EXPLORE</span><h3>Beranda</h3></div><span class="live-pill">● LIVE</span></div>
+      <div class="feed"><div id="feedList"></div></div>
+    </section>
+
+    <!-- TAB VIP -->
+    <section id="tabVip" class="tab-content hidden">
+      <div class="vip-banner">
+        <h3>Area VIP</h3>
+        <p id="vipStatusText"></p>
+        <button id="upgradeBtn">Upgrade ke VIP</button>
+      </div>
+      <div class="feed"><div id="vipList"></div></div>
+    </section>
+
+    <!-- TAB PROFIL -->
+    <section id="tabProfile" class="tab-content hidden">
+      <div class="profile-head">
+        <div class="avatar" id="avatar">?</div>
+        <div class="profile-info">
+          <h3 id="profName">-</h3>
+          <p id="profBio">Belum ada bio.</p>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="stat"><b id="statPosts">0</b><span>Post</span></div>
+        <button class="stat stat-click" data-people-type="followers" data-people-user="me" type="button"><b id="statFollowers">0</b><span>Follower</span></button>
+        <button class="stat stat-click" data-people-type="following" data-people-user="me" type="button"><b id="statFollowing">0</b><span>Following</span></button>
+        <div class="stat"><b id="statLikes">0</b><span>Like</span></div>
+      </div>
+      <div class="feed">
+        <h3>Postingan Saya</h3>
+        <div id="myPostsList"></div>
+      </div>
+    </section>
+
+    <!-- TAB PROFIL USER LAIN -->
+    <section id="tabOtherProfile" class="tab-content hidden">
+      <button class="back-btn" id="backToFeed">← Kembali</button>
+      <div class="profile-head">
+        <div class="avatar" id="oAvatar">?</div>
+        <div class="profile-info">
+          <h3 id="oName">-</h3>
+          <p id="oBio">-</p>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="stat"><b id="oPosts">0</b><span>Post</span></div>
+        <button class="stat stat-click" data-people-type="followers" data-people-user="other" type="button"><b id="oFollowers">0</b><span>Follower</span></button>
+        <button class="stat stat-click" data-people-type="following" data-people-user="other" type="button"><b id="oFollowing">0</b><span>Following</span></button>
+        <div class="stat"><b id="oLikes">0</b><span>Like</span></div>
+      </div>
+      <div class="row-btns">
+        <button id="followBtn">Follow</button>
+        <button id="dmBtn">Kirim Pesan</button>
+      </div>
+      <div class="feed">
+        <h3>Postingan @<span id="oName2"></span></h3>
+        <div id="oPostList"></div>
+      </div>
+    </section>
+
+    <!-- TAB NOTIF -->
+    <section id="tabNotif" class="tab-content hidden">
+      <h3>Notifikasi</h3>
+      <div id="notifList"></div>
+    </section>
+
+    <!-- TAB DM -->
+    <section id="tabDM" class="tab-content hidden">
+      <div class="dm-page-head">
+        <div class="dm-profile-mini" id="dmMyProfile">?</div>
+        <div><span class="eyebrow">PESAN</span><h3>Pesan Langsung</h3><small>Ngobrol lebih dekat dengan temanmu.</small></div>
+      </div>
+      <div id="dmList"></div>
+    </section>
+  </div>
+
+  <!-- HALAMAN POSTING -->
+  <div id="postPage" class="fullpage hidden">
+    <header class="subbar">
+      <button class="icon-btn" id="postBack">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <h2 id="postPageTitle">Buat Postingan</h2>
+    </header>
+    <div class="post-form">
+      <p class="msg" id="postMsg"></p>
+      <textarea id="postCaption" placeholder="Tulis caption..."></textarea>
+      <label class="media-pick">
+        <input type="file" id="postMedia" accept="image/*,video/*">
+        <span>Pilih Foto / Video</span>
+      </label>
+      <div id="postPreview"></div>
+      <label class="check hidden" id="vipPostWrap">
+        <input type="checkbox" id="vipPostCheck">
+        <span>Posting ini sebagai VIP (khusus admin)</span>
+      </label>
+      <button id="postSubmit" type="button">Unggah</button>
+    </div>
+  </div>
+
+  <!-- HALAMAN KOMENTAR -->
+  <div id="commentPage" class="fullpage hidden">
+    <header class="subbar">
+      <button class="icon-btn" id="commentBack">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <h2>Komentar</h2>
+    </header>
+    <div class="post-preview" id="commentPostPreview"></div>
+    <div id="commentList" class="comment-list"></div>
+    <form id="commentForm" class="comment-form">
+      <div class="reply-info hidden" id="replyInfo">
+        <span id="replyToName"></span>
+        <button type="button" id="cancelReply">✕</button>
+      </div>
+      <button type="button" id="commentStickerBtn" class="comment-sticker-btn" title="Sticker">☺</button>
+      <input type="text" id="commentInput" placeholder="Tulis komentar..." required>
+      <button type="submit">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+      </button>
+    </form>
+    <div id="commentStickerTray" class="sticker-tray hidden" aria-label="Sticker komentar">
+      <button type="button" data-sticker="👍">👍</button><button type="button" data-sticker="❤️">❤️</button><button type="button" data-sticker="😂">😂</button><button type="button" data-sticker="🔥">🔥</button><button type="button" data-sticker="😍">😍</button><button type="button" data-sticker="👏">👏</button><button type="button" data-sticker="😎">😎</button><button type="button" data-sticker="💯">💯</button>
+    </div>
+  </div>
+
+  <!-- HALAMAN PENGATURAN -->
+  <div id="settingsPage" class="fullpage hidden">
+    <header class="subbar">
+      <button class="icon-btn" id="settingsBack">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <h2>Pengaturan</h2>
+    </header>
+    <div class="settings-form">
+      <h3>Edit Profil</h3>
+      <div class="avatar-edit">
+        <div class="avatar big" id="editAvatarPreview">?</div>
+        <label class="avatar-upload">
+          <input type="file" id="editAvatarFile" accept="image/*">
+          <span>Ganti Foto Profil</span>
+        </label>
+      </div>
+      <input type="text" id="editBio" placeholder="Tulis bio...">
+      <button id="saveProfile" type="button">Simpan Profil</button>
+
+      <h3>Tema</h3>
+      <div class="theme-toggle">
+        <button id="themeDark" class="theme-btn" type="button">🌙 Dark</button>
+        <button id="themeLight" class="theme-btn" type="button">☀️ Light</button>
+      </div>
+
+      <h3>Data</h3>
+      <button id="exportData" class="secondary" type="button">Export Data</button>
+      <button id="importDataBtn" class="secondary" type="button">Import Data</button>
+      <input type="file" id="importDataFile" accept=".json" style="display:none">
+
+      <h3>Akun</h3>
+      <button id="logoutBtn" class="danger" type="button">Logout</button>
+    </div>
+  </div>
+
+  <!-- HALAMAN DM CHAT -->
+  <div id="dmChatPage" class="fullpage hidden">
+    <header class="subbar chat-header">
+      <button class="icon-btn" id="dmBack"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></button>
+      <button class="icon-btn chat-profile-btn" id="dmProfileBtn" type="button" title="Lihat profil">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-4 0-9 2-9 5v3h18v-3c0-3-5-5-9-5z"/></svg>
+      </button>
+      <span class="online-dot">●</span>
+    </header>
+    <div id="dmMessages" class="dm-messages"></div>
+    <form id="dmForm" class="comment-form chat-form">
+      <div class="reply-info hidden" id="dmReplyInfo"><span id="dmReplyText">Membalas pesan</span><button type="button" id="cancelDmReply">✕</button></div>
+      <input type="text" id="dmInput" placeholder="Tulis pesan..." required>
+      <button type="submit" aria-label="Kirim"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+    </form>
+  </div>
+
+  <!-- HALAMAN SEARCH -->
+  <div id="searchPage" class="fullpage hidden">
+    <header class="subbar">
+      <button class="icon-btn" id="searchBack">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <input type="text" id="searchInput" placeholder="Cari username..." autocomplete="off">
+    </header>
+    <div id="searchResults" class="search-results"></div>
+  </div>
+
+  <!-- HALAMAN STORY VIEW -->
+  <div id="storyViewPage" class="fullpage hidden">
+    <header class="subbar">
+      <button class="icon-btn" id="storyViewBack">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <h2 id="storyViewUser">-</h2>
+      <span class="story-timer" id="storyTimer">24j</span>
+    </header>
+    <div class="story-view-wrap">
+      <div class="story-progress"><div class="story-progress-bar" id="storyProgressBar"></div></div>
+      <div id="storyViewContent" class="story-view-content"></div>
+    </div>
+  </div>
+
+  <!-- HALAMAN BUAT STORY -->
+  <div id="storyAddPage" class="fullpage hidden">
+    <header class="subbar">
+      <button class="icon-btn" id="storyAddBack">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <h2>Buat Story</h2>
+    </header>
+    <div class="post-form">
+      <p class="msg" id="storyMsg"></p>
+      <p style="font-size:13px;color:var(--muted)">Story akan hilang otomatis dalam 24 jam.</p>
+      <label class="media-pick">
+        <input type="file" id="storyMedia" accept="image/*,video/*">
+        <span>Pilih Foto / Video</span>
+      </label>
+      <div id="storyPreview"></div>
+      <textarea id="storyCaption" placeholder="Caption story (opsional)"></textarea>
+      <button id="storySubmit" type="button">Posting Story</button>
+    </div>
+  </div>
+
+  <!-- MENU TITIK TIGA -->
+  <div id="postMenu" class="modal hidden">
+    <div class="modal-content small">
+      <button class="menu-item" id="menuEditPost" type="button">Edit Caption</button>
+      <button class="menu-item" id="menuDeletePost" type="button">Hapus Postingan</button>
+      <button class="menu-item" id="menuSavePost" type="button">Simpan Postingan</button>
+      <button class="menu-item cancel" id="menuCancel" type="button">Batal</button>
+    </div>
+  </div>
+
+  <!-- HALAMAN PENGIKUT / MENGIKUTI -->
+  <div id="peoplePage" class="fullpage hidden utility-page">
+    <header class="subbar"><button class="icon-btn" id="peopleBack" type="button" title="Kembali"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 1.4 1.4L10.8 12z"/></svg></button><h2 id="peopleTitle">Pengguna</h2></header>
+    <div class="utility-shell"><div id="peopleList"></div></div>
+  </div>
+
+  <!-- HALAMAN FAVORIT -->
+  <div id="favoritePage" class="fullpage hidden utility-page">
+    <header class="subbar"><button class="icon-btn" id="favoriteBack" type="button" title="Kembali"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 1.4 1.4L10.8 12z"/></svg></button><h2>Favorit</h2></header>
+    <div class="utility-shell"><div id="favoriteList"></div></div>
+  </div>
+
+  <!-- INFO ADMIN / MENU SAMPING -->
+  <div id="infoDrawerOverlay" class="drawer-overlay hidden"></div>
+  <aside id="infoDrawer" class="info-drawer" aria-hidden="true">
+    <div class="drawer-head"><div><span class="eyebrow">NDOOHLCC</span><h2>Info & Bantuan</h2></div><button id="infoClose" class="icon-btn" type="button" title="Tutup">×</button></div>
+    <div class="drawer-section">
+      <button class="drawer-item" type="button" data-contact-action="contact">✉ <span><b>Kontak Admin</b><small>Hubungi admin</small></span></button>
+      <button class="drawer-item" type="button" data-contact-action="feedback">✦ <span><b>Feedback</b><small>Kirim saran dan masukan</small></span></button>
+      <button class="drawer-item" type="button" data-contact-action="report">⚠ <span><b>Lapor Masalah</b><small>Laporkan bug atau kendala</small></span></button>
+      <button class="drawer-item" type="button" data-contact-action="donate">♡ <span><b>Donasi</b><small>Dukung pengembangan</small></span></button>
+      <button class="drawer-item" id="favoriteBtn" type="button">★ <span><b>Favorit Postingan</b><small>Postingan yang kamu simpan</small></span></button>
+      <button class="drawer-item hidden" id="adminPanelBtn" type="button">⚙ <span><b>Panel Admin</b><small>Kelola user dan moderasi</small></span></button>
+    </div>
+    <div class="drawer-license">Lisensi<br><b>Web ini sepenuhnya dibuat oleh NdooHlcc.Dev</b></div>
+  </aside>
+
+  <!-- HALAMAN ADMIN -->
+  <div id="adminPage" class="fullpage hidden utility-page">
+    <header class="subbar"><button class="icon-btn" id="adminBack" type="button" title="Kembali"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4 1.4L10.8 12z"/></svg></button><h2>Panel Admin</h2></header>
+    <div class="utility-shell admin-shell">
+      <div class="admin-summary"><span class="eyebrow">MODERASI LOKAL</span><b>Kelola akun, ban, dan banding</b><small>Data moderasi pada versi ini tersimpan di perangkat/browser yang sama.</small></div>
+      <div id="adminUserList" class="admin-user-list"></div>
+    </div>
+  </div>
+
+  <!-- HALAMAN MUSIK -->
+  <div id="musicPage" class="fullpage hidden music-page">
+    <header class="subbar music-subbar">
+      <button class="icon-btn" id="musicBack" type="button" title="Kembali">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <div><h2>Musik</h2><small>Koleksi musikmu</small></div>
+      <button class="icon-btn" id="musicAddBtn" type="button" title="Tambah musik">＋</button>
+      <input type="file" id="musicFile" accept="audio/*" multiple hidden>
+    </header>
+    <div class="music-shell">
+      <div class="music-hero-card">
+        <div class="music-cover">♫</div>
+        <div><span class="eyebrow">MUSIC</span><h3>Mainkan musik sambil menjelajah.</h3><p>Pilih musik dari perangkatmu dan pemutar tetap aktif saat pindah halaman.</p></div>
+      </div>
+      <div class="music-section-head"><div><span class="eyebrow">KOLEKSI</span><h3>Musik kamu</h3></div><div class="music-section-actions"><button class="ui-action-btn" id="musicFloatBtn" type="button">Pemutar: Tidak Mengambang</button><button class="ui-action-btn" id="musicClearBtn" type="button">Hapus semua</button></div></div>
+      <div id="musicList" class="music-list"></div>
+    </div>
+  </div>
+
+  <!-- PEMUTAR MUSIK MENGAMBANG -->
+  <div id="musicPlayer" class="music-player hidden">
+    <div class="music-player-main">
+      <div class="music-player-cover" id="musicPlayerCover">♫</div>
+      <div class="music-player-copy"><b id="musicPlayerTitle">-</b><small id="musicPlayerMeta">-</small></div>
+    </div>
+    <button class="music-player-btn" id="musicPlayPause" type="button" aria-label="Play/Pause">▶</button>
+    <button class="music-player-btn close" id="musicPlayerClose" type="button" aria-label="Tutup pemutar">×</button>
+    <audio id="globalAudio" preload="metadata"></audio>
+  </div>
+
+  <!-- HALAMAN AI NDOOHLCC -->
+  <div id="aiPage" class="fullpage hidden ai-page">
+    <header class="subbar ai-subbar">
+      <button class="icon-btn" id="aiBack" type="button" title="Kembali">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg>
+      </button>
+      <div class="ai-title-wrap">
+        <div class="ai-mini-mark">✦</div>
+        <div><h2>AI NdooHlcc</h2><small>Teman ngobrol NdooHlcc</small></div>
+      </div>
+      <span class="ai-online">● ONLINE</span>
+    </header>
+    <div class="ai-shell">
+      <div class="ai-hero-card">
+        <div class="ai-orb">✦</div>
+        <div class="ai-hero-copy"><span class="eyebrow">NDOOHLCC</span><h3>Ngobrol aja, Bos.</h3><p>Ide, coding, cerita, caption, atau sekadar ngobrol.</p></div>
+        <div class="ai-hero-actions"><button type="button" class="ui-action-btn" id="aiNewChat">＋ Baru</button><button type="button" class="ui-action-btn" id="aiHistoryBtn">Riwayat</button></div>
+      </div>
+      <div id="aiHistoryPanel" class="ai-history-panel hidden"></div>
+      <div id="aiMessages" class="ai-messages">
+        <div class="ai-message ai-message-bot"><div class="ai-avatar">N</div><div class="ai-bubble"><strong>AI NdooHlcc</strong><p>Yo Bos 👋 Mau ngerjain apa hari ini?</p></div></div>
+      </div>
+      <div class="ai-suggestions">
+        <button type="button" class="ai-chip" data-ai-prompt="Kasih ide fitur keren untuk web social media ini">💡 Ide fitur</button>
+        <button type="button" class="ai-chip" data-ai-prompt="Bantu debug kode JavaScript ini: ">🛠️ Debug JS</button>
+        <button type="button" class="ai-chip" data-ai-prompt="Bikinin caption singkat yang keren dan tidak alay: ">✍️ Caption</button>
+      </div>
+      <form id="aiForm" class="ai-form">
+        <textarea id="aiInput" rows="1" placeholder="Tulis pesan ke AI NdooHlcc..." maxlength="4000" required></textarea>
+        <button type="submit" id="aiSend" class="ai-send" aria-label="Kirim pesan">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+        </button>
+      </form>
+      <p class="ai-disclaimer">Jangan kirim password, token, atau data pribadi sensitif.</p>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="tabPublic" title="Home"><span class="nav-icon"><svg viewBox="0 0 24 24" width="21" height="21" fill="currentColor"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg></span><span class="nav-label">Home</span></button>
+    <button class="nav-btn" data-tab="tabVip" title="VIP"><span class="nav-icon"><svg viewBox="0 0 24 24" width="21" height="21" fill="currentColor"><path d="M12 2 9 9H2l6 4-2 9 6-4 6 4-2-9 6-4h-7z"/></svg></span><span class="nav-label">VIP</span></button>
+    <button class="nav-btn plus" id="plusBtn" title="Buat Post"><span class="plus-icon"><svg viewBox="0 0 24 24" width="27" height="27" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></span><span class="nav-label">Buat</span></button>
+    <button class="nav-btn" data-tab="tabDM" title="Pesan"><span class="nav-icon nav-icon-badged"><svg viewBox="0 0 24 24" width="21" height="21" fill="currentColor"><path d="M2 4h20v12H7l-5 5z"/></svg><span id="dmCount" class="badge dm-badge hidden">0</span></span><span class="nav-label">Chat</span></button>
+    <button class="nav-btn" data-tab="tabProfile" title="Profil"><span class="nav-icon"><svg viewBox="0 0 24 24" width="21" height="21" fill="currentColor"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-4 0-9 2-9 5v3h18v-3c0-3-5-5-9-5z"/></svg></span><span class="nav-label">Profil</span></button>
+  </nav>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/core.js"></script>
+<script src="js/online.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/social.js"></script>
+<script src="js/post.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/router.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
