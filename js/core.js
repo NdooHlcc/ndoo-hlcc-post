@@ -338,6 +338,18 @@ function applyTheme(mode) {
   document.getElementById('themeLight')?.classList.toggle('active', theme === 'light');
 }
 
+function formatUploadError(error, label = 'File') {
+  const raw = String(error?.cause?.message || error?.message || '').trim();
+  if (/row-level security|not authorized|permission|403/i.test(raw)) return `${label} gagal: izin Storage ditolak. Cek policy bucket di Supabase.`;
+  if (/bucket.*not found|not found.*bucket/i.test(raw)) return `${label} gagal: bucket Storage tidak ditemukan.`;
+  if (/payload too large|too large|exceeded|size/i.test(raw)) return `${label} gagal: ukuran file terlalu besar.`;
+  if (/duplicate|already exists/i.test(raw)) return `${label} gagal: file bentrok, coba pilih file lagi.`;
+  if (/session|jwt|unauthorized/i.test(raw)) return `${label} gagal: sesi login kedaluwarsa. Login ulang.`;
+  if (raw) return `${label} gagal: ${raw}`;
+  if (error?.name === 'QuotaExceededError') return 'Penyimpanan perangkat penuh. Hapus data lama lalu coba lagi.';
+  return `${label} gagal disimpan. Coba lagi.`;
+}
+
 function validateMedia(file, maxBytes) {
   if (!file) return { ok: false, message: 'Pilih foto/video dulu.' };
   const image = file.type.startsWith('image/');
