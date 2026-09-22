@@ -1,0 +1,68 @@
+:root {
+  --bg: #eef0ed;
+  --bg2: #f7f8f6;
+  --panel: rgba(247,249,246,.78);
+  --panel2: #e1e5e0;
+  --panel3: #d6dbd5;
+  --border: #cbd2c8;
+  --text: #1b201c;
+  --muted: #626b63;
+  --accent: #b7ff2a;
+  --accent2: #d7ff79;
+  --accent3: #7fae10;
+  --pink: #b7ff2a;
+  --cyan: #9fcb42;
+  --danger: #e5484d;
+  --vip: #9bcf22;
+  --glow: 0 12px 34px rgba(183,255,42,.18);
+  --shadow: 0 10px 30px rgba(35,45,37,.10);
+  --radius: 20px;
+  --safe-x: clamp(14px, 4vw, 28px);
+}
+
+body:not(.light) {
+  --bg: #111513;
+  --bg2: #171c19;
+  --panel: rgba(29,35,31,.78);
+  --panel2: #252c27;
+  --panel3: #303932;
+  --border: #3b473d;
+  --text: #f2f7f1;
+  --muted: #aab5aa;
+  --accent: #b7ff2a;
+  --accent2: #d7ff79;
+  --accent3: #7fae10;
+  --pink: #b7ff2a;
+  --cyan: #9fcb42;
+  --danger: #fb7185;
+  --vip: #d7ff79;
+  --glow: 0 14px 40px rgba(183,255,42,.20);
+  --shadow: 0 12px 34px rgba(0,0,0,.25);
+}
+
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--bg); }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(183,255,42,.10), transparent 28%),
+    radial-gradient(circle at 95% 15%, rgba(159,203,66,.07), transparent 25%),
+    var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding-bottom: 92px;
+  -webkit-font-smoothing: antialiased;
+  transition: background .35s ease, color .35s ease;
+}
+button, input, textarea { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+::selection { background: rgba(183,255,42,.24); color: var(--text); }
+.hidden { display: none !important; }
+.page { min-height: 100vh; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid rgba(183,255,42,.24); outline-offset: 2px; }
+
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+@keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-9px); } }
+@keyframes shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
+@keyframes pulseGlow { 0%,100% { box-shadow:0 0 0 0 rgba(183,255,42,.0); } 50% { box-shadow:0 0 0 8px rgba(183,255,42,.08); } }
