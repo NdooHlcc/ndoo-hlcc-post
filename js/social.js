@@ -335,6 +335,7 @@ let currentStoryUser = null;
 let currentStoryIndex = 0;
 let storyProgressTimer = null;
 let storyMediaData = null;
+let storyMediaFile = null;
 let storyMediaType = null;
 
 async function loadStoryBar() {
@@ -360,6 +361,7 @@ async function loadStoryBar() {
 
 function openStoryComposer() {
   storyMediaData = null;
+  storyMediaFile = null;
   storyMediaType = null;
   document.getElementById('storyAddPage')?.classList.remove('hidden');
   document.getElementById('storyMsg').textContent = '';
@@ -419,6 +421,7 @@ document.getElementById('storyMedia')?.addEventListener('change', async event =>
   msg.textContent = result.ok ? '' : result.message;
   if (!result.ok) return;
   try {
+    storyMediaFile = file;
     storyMediaData = await readFileAsDataURL(file);
     storyMediaType = result.type;
     document.getElementById('storyPreview').innerHTML = result.type === 'image'
@@ -431,11 +434,11 @@ document.getElementById('storySubmit')?.addEventListener('click', async () => {
   const msg = document.getElementById('storyMsg');
   if (!storyMediaData) { msg.textContent = 'Pilih foto/video dulu.'; return; }
   try {
-    await saveStory({ user: currentUser(), media: storyMediaData, mediaType: storyMediaType, caption: document.getElementById('storyCaption').value.trim(), created: Date.now() });
+    await saveStory({ user: currentUser(), media: storyMediaData, mediaFile: storyMediaFile, mediaType: storyMediaType, caption: document.getElementById('storyCaption').value.trim(), created: Date.now() });
     msg.style.color = 'var(--accent2)';
     msg.textContent = 'Story berhasil diunggah!';
     setTimeout(() => { msg.style.color = ''; document.getElementById('storyAddPage')?.classList.add('hidden'); loadStoryBar(); }, 700);
-  } catch { msg.textContent = 'Story gagal disimpan.'; }
+  } catch (error) { msg.textContent = formatUploadError(error, 'Story'); console.error('Story gagal:', error); }
 });
 
 /* -------------------- SEARCH -------------------- */
