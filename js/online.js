@@ -23,19 +23,27 @@ function mediaExtension(mediaType, dataUrl) {
   return map[mime] || (mediaType === 'video' ? 'mp4' : 'jpg');
 }
 
-async function uploadPostMedia(dataUrl, mediaType) {
+async function uploadPostMedia(media, mediaType) {
   const session = await getSupabaseSession();
-  if (!session?.user) throw new Error('Sesi Supabase tidak ditemukan.');
+  if (!session?.user) throw new Error('Sesi Supabase tidak ditemukan. Silakan login ulang.');
   const client = requireSupabase();
-  const ext = mediaExtension(mediaType, dataUrl);
+  const isFile = media instanceof Blob;
+  const ext = isFile
+    ? mediaExtension(mediaType, `data:${media.type || ''};base64,`)
+    : mediaExtension(mediaType, media);
   const path = `${session.user.id}/${crypto.randomUUID()}.${ext}`;
-  const blob = dataUrlToBlob(dataUrl);
+  const blob = isFile ? media : dataUrlToBlob(media);
   const { error } = await client.storage.from('posts').upload(path, blob, {
-    contentType: blob.type,
+    contentType: blob.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
     upsert: false,
     cacheControl: '31536000'
   });
-  if (error) throw error;
+  if (error) {
+    const detail = new Error(`Upload media post gagal: ${error.message || 'Storage error'}`);
+    detail.name = error.name || 'StorageError';
+    detail.cause = error;
+    throw detail;
+  }
   const { data } = client.storage.from('posts').getPublicUrl(path);
   return data.publicUrl;
 }
@@ -82,10 +90,10 @@ async function getPostById(id) {
   return posts.find(post => Number(post.id) === Number(id)) || null;
 }
 
-async function createOnlinePost({ caption, media, mediaType }) {
+async function createOnlinePost({ caption, media, mediaFile, mediaType }) {
   const session = await getSupabaseSession();
   if (!session?.user) throw new Error('Sesi login online tidak valid.');
-  const mediaUrl = await uploadPostMedia(media, mediaType);
+  const mediaUrl = await uploadPostMedia(mediaFile || media, mediaType);
   const { data, error } = await requireSupabase().from('posts').insert({
     user_id: session.user.id,
     content: caption || '',
@@ -506,19 +514,35 @@ async function loadOnlineStories() {
   return rows.map(x => ({ id: x.id, user: map.get(x.user_id)?.username || 'user', userId: x.user_id, media: x.media_url, mediaType: x.media_type, caption: x.caption || '', created: new Date(x.created_at).getTime() }));
 }
 
-async function uploadStoryMedia(dataUrl, mediaType) {
-  const session = await getSupabaseSession(); if (!session?.user) throw new Error('Sesi login online tidak valid.');
-  const ext = mediaExtension(mediaType, dataUrl); const path = `${session.user.id}/${crypto.randomUUID()}.${ext}`;
-  const blob = dataUrlToBlob(dataUrl);
-  const { error } = await requireSupabase().storage.from('stories').upload(path, blob, { contentType: blob.type, upsert: false, cacheControl: '31536000' });
-  if (error) throw error;
-  return requireSupabase().storage.from('stories').getPublicUrl(path).data.publicUrl;
+async function uploadStoryMedia(media, mediaType) {
+  const session = await getSupabaseSession();
+  if (!session?.user) throw new Error('Sesi Supabase tidak ditemukan. Silakan login ulang.');
+  const client = requireSupabase();
+  const isFile = media instanceof Blob;
+  const ext = isFile
+    ? mediaExtension(mediaType, `data:${media.type || ''};base64,`)
+    : mediaExtension(mediaType, media);
+  const path = `${session.user.id}/${crypto.randomUUID()}.${ext}`;
+  const blob = isFile ? media : dataUrlToBlob(media);
+  const { error } = await client.storage.from('stories').upload(path, blob, {
+    contentType: blob.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg'),
+    upsert: false,
+    cacheControl: '31536000'
+  });
+  if (error) {
+    const detail = new Error(`Upload media story gagal: ${error.message || 'Storage error'}`);
+    detail.name = error.name || 'StorageError';
+    detail.cause = error;
+    throw detail;
+  }
+  return client.storage.from('stories').getPublicUrl(path).data.publicUrl;
 }
 
 async function saveStory(story) {
   try {
-    const session = await getSupabaseSession(); if (!session?.user) throw new Error('Sesi login online tidak valid.');
-    const url = await uploadStoryMedia(story.media, story.mediaType);
+    const session = await getSupabaseSession();
+    if (!session?.user) throw new Error('Sesi login online tidak valid.');
+    const url = await uploadStoryMedia(story.mediaFile || story.media, story.mediaType);
     const { error } = await requireSupabase().from('stories').insert({ user_id: session.user.id, media_url: url, media_type: story.mediaType, caption: story.caption || '' });
     if (error) throw error;
   } catch (error) {
