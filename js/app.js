@@ -19,9 +19,15 @@ function showAuth() {
 function showDashboard() {
   const username = currentUser();
   const me = username ? getUserByName(username) : null;
-  if (!username || !me || getBanInfo(me)) {
+  if (!username || !me) {
     sessionStorage.removeItem(NDOO_CONFIG.SS_LOGIN);
     showAuth();
+    return;
+  }
+  const ban = getBanInfo(me);
+  if (ban) {
+    showAuth();
+    showBanPanel(me, ban);
     return;
   }
   document.getElementById('authPage')?.classList.add('hidden');
