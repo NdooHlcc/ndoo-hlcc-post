@@ -85,22 +85,22 @@ function bindPostEvents(container) {
 
 /* -------------------- PROFILE -------------------- */
 async function loadMyProfile() {
-  const me = getMe();
-  if (!me) return;
-  document.getElementById('profName').textContent = `@${me.username}`;
-  document.getElementById('profBio').textContent = me.bio || 'Belum ada bio.';
-  const avatar = document.getElementById('avatar');
-  setProfileAvatar(avatar, me);
+  await refreshOnlineProfiles().catch(() => {});
+  await syncFollowShadows().catch(() => {});
+  const profile = onlineProfileByName(currentUser()) || getMe();
+  if (!profile) return;
+  const me = getMe() || profile;
+  document.getElementById('profName').textContent = `@${profile.username}`;
+  document.getElementById('profBio').textContent = profile.bio || 'Belum ada bio.';
+  setProfileAvatar(document.getElementById('avatar'), { ...me, avatar: profile.avatar_url || me.avatar, username: profile.username });
   document.getElementById('statFollowers').textContent = me.followers?.length || 0;
   document.getElementById('statFollowing').textContent = me.following?.length || 0;
-
-  const mine = (await getAllPosts()).filter(post => post.user === me.username).sort((a, b) => b.created - a.created);
+  const mine = (await getAllPosts()).filter(post => String(post.userId) === String(profile.id)).sort((a, b) => b.created - a.created);
   document.getElementById('statPosts').textContent = mine.length;
   document.getElementById('statLikes').textContent = mine.reduce((total, post) => total + (post.likes?.length || 0), 0);
   const list = document.getElementById('myPostsList');
   if (!mine.length) { list.innerHTML = '<div class="grid-empty">Belum ada postingan. Tekan tombol <b>+</b> untuk membuat post pertamamu.</div>'; return; }
-  list.innerHTML = renderProfileGrid(mine);
-  bindProfileGridEvents(list);
+  list.innerHTML = renderProfileGrid(mine); bindProfileGridEvents(list);
 }
 
 function renderProfileGrid(posts) {
@@ -125,36 +125,31 @@ let viewingUser = null;
 
 async function openOtherProfile(username) {
   closeTransientPages();
-  const me = currentUser();
-  if (!me || String(username).toLowerCase() === String(me).toLowerCase()) {
-    document.querySelector('.nav-btn[data-tab="tabProfile"]')?.click();
-    return;
+  const meName = currentUser();
+  if (!meName || String(username).toLowerCase() === String(meName).toLowerCase()) {
+    document.querySelector('.nav-btn[data-tab="tabProfile"]')?.click(); return;
   }
-  const target = getUserByName(username);
-  const self = getUserByName(me);
-  if (!target || !self) return;
-  username = target.username;
-  viewingUser = username;
+  await refreshOnlineProfiles().catch(() => {});
+  await syncFollowShadows().catch(() => {});
+  const targetProfile = onlineProfileByName(username);
+  if (!targetProfile) { showToast('Profil tidak ditemukan.', 'error'); return; }
+  const target = getUserByName(targetProfile.username) || { username: targetProfile.username, bio: targetProfile.bio, avatar: targetProfile.avatar_url, followers: [], following: [] };
+  const self = getMe();
+  username = targetProfile.username; viewingUser = username;
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
   document.getElementById('tabOtherProfile')?.classList.remove('hidden');
-
-  document.getElementById('oName').textContent = `@${target.username}`;
-  document.getElementById('oName2').textContent = target.username;
-  document.getElementById('oBio').textContent = target.bio || 'Belum ada bio.';
-  setProfileAvatar(document.getElementById('oAvatar'), target);
+  document.getElementById('oName').textContent = `@${username}`;
+  document.getElementById('oName2').textContent = username;
+  document.getElementById('oBio').textContent = targetProfile.bio || 'Belum ada bio.';
+  setProfileAvatar(document.getElementById('oAvatar'), { ...target, avatar: targetProfile.avatar_url || target.avatar, username });
   document.getElementById('oFollowers').textContent = target.followers?.length || 0;
   document.getElementById('oFollowing').textContent = target.following?.length || 0;
-
+  const following = self?.following?.some(name => String(name).toLowerCase() === String(username).toLowerCase());
   const followButton = document.getElementById('followBtn');
-  const following = self.following?.some(name => String(name).toLowerCase() === String(username).toLowerCase());
   followButton.textContent = following ? 'Unfollow' : 'Follow';
-  followButton.onclick = () => toggleFollow(username);
-  document.getElementById('dmBtn').onclick = () => {
-    showTab('tabDM');
-    openDMChat(username);
-  };
-
-  const posts = (await getAllPosts()).filter(post => post.user === username).sort((a, b) => b.created - a.created);
+  followButton.onclick = async () => { try { await toggleFollowOnline(username); } catch (e) { console.error(e); showToast('Follow gagal.', 'error'); } };
+  document.getElementById('dmBtn').onclick = () => openDMChatOnline(username);
+  const posts = (await getAllPosts()).filter(post => String(post.userId) === String(targetProfile.id)).sort((a, b) => b.created - a.created);
   document.getElementById('oPosts').textContent = posts.length;
   document.getElementById('oLikes').textContent = posts.reduce((total, post) => total + (post.likes?.length || 0), 0);
   const list = document.getElementById('oPostList');
@@ -162,39 +157,30 @@ async function openOtherProfile(username) {
   bindProfileGridEvents(list);
 }
 
-function toggleFollow(targetUser) {
-  const me = currentUser();
-  const users = getUsers();
-  const self = users.find(user => user.username === me);
-  const target = users.find(user => user.username === targetUser);
-  if (!self || !target || targetUser === me) return;
-  self.following ||= [];
-  target.followers ||= [];
-  const index = self.following.findIndex(name => String(name).toLowerCase() === String(targetUser).toLowerCase());
-  if (index >= 0) {
-    self.following.splice(index, 1);
-    const followerIndex = target.followers.findIndex(name => String(name).toLowerCase() === String(me).toLowerCase());
-    if (followerIndex >= 0) target.followers.splice(followerIndex, 1);
-  } else {
-    self.following.push(targetUser);
-    if (!target.followers.includes(me)) target.followers.push(me);
-    createNotification(targetUser, 'follow', `${me} mulai mengikuti kamu`, null);
-  }
-  saveUsers(users);
-  openOtherProfile(targetUser);
+async function toggleFollowOnline(targetUser) {
+  return toggleFollowOnlineData(targetUser);
 }
 
-function openPeoplePage(type, username) {
-  const target = username === 'me' ? getMe() : getUserByName(viewingUser);
+async function toggleFollow(targetUser) {
+  const profile = onlineProfileByName(targetUser);
+  if (!profile) { await refreshOnlineProfiles(); }
+  return toggleFollowOnlineData(targetUser);
+}
+
+async function openPeoplePage(type, username) {
+  await refreshOnlineProfiles().catch(() => {});
+  await syncFollowShadows().catch(() => {});
+  const name = username === 'me' ? currentUser() : (viewingUser || username);
+  const target = onlineProfileByName(name) || getUserByName(name);
   if (!target) return;
   closeTransientPages();
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
   const page = document.getElementById('peoplePage'); page?.classList.remove('hidden');
-  const title = document.getElementById('peopleTitle');
-  title.textContent = type === 'followers' ? `Pengikut @${target.username}` : `Mengikuti @${target.username}`;
-  const names = type === 'followers' ? (target.followers || []) : (target.following || []);
+  document.getElementById('peopleTitle').textContent = type === 'followers' ? `Pengikut @${target.username}` : `Mengikuti @${target.username}`;
+  const localTarget = getUserByName(target.username) || target;
+  const names = type === 'followers' ? (localTarget.followers || []) : (localTarget.following || []);
   const list = document.getElementById('peopleList');
-  list.innerHTML = names.length ? names.map(name => `<div class="search-user" data-user="${escapeHtml(name)}">${avatarHtml(name,44)}<div class="search-user-info"><b>@${escapeHtml(name)}</b><p>${escapeHtml(getUserByName(name)?.bio || 'Belum ada bio')}</p></div></div>`).join('') : '<div class="empty-state">Belum ada data.</div>';
+  list.innerHTML = names.length ? names.map(name => `<div class="search-user" data-user="${escapeHtml(name)}">${avatarHtml(name,44)}<div class="search-user-info"><b>@${escapeHtml(name)}</b><p>${escapeHtml(getUserByName(name)?.bio || onlineProfileByName(name)?.bio || 'Belum ada bio')}</p></div></div>`).join('') : '<div class="empty-state">Belum ada data.</div>';
   list.querySelectorAll('[data-user]').forEach(item => item.addEventListener('click', () => { page?.classList.add('hidden'); openOtherProfile(item.dataset.user); }));
 }
 
@@ -206,89 +192,17 @@ document.getElementById('backToFeed')?.addEventListener('click', () => showTab('
 /* -------------------- DM -------------------- */
 let currentDMPartner = null;
 let dmReplyTarget = null;
-function dmPair(a, b) { return [a, b].sort().join('|'); }
-
-function sendDM(to, text, replyTo = null) {
-  const from = currentUser();
-  return dbTransaction(NDOO_CONFIG.STORE_DMS, 'readwrite', store => {
-    store.add({ pair: dmPair(from, to), from, to, text, replyTo, created: Date.now() });
-  }).then(() => createNotification(to, 'dm', `${from} mengirim pesan`, null));
-}
-
-async function getConversations() {
-  const all = await dbRequest(NDOO_CONFIG.STORE_DMS, 'readonly', store => store.getAll());
-  const me = currentUser();
-  const map = {};
-  (all || []).filter(message => String(message.from).toLowerCase() === String(me).toLowerCase() || String(message.to).toLowerCase() === String(me).toLowerCase()).forEach(message => {
-    const partner = String(message.from).toLowerCase() === String(me).toLowerCase() ? message.to : message.from;
-    if (!map[partner] || message.created > map[partner].last.created) map[partner] = { partner, last: message };
-  });
-  return Object.values(map).sort((a, b) => b.last.created - a.last.created);
-}
-
-function getMessagesWith(partner) {
-  return dbRequest(NDOO_CONFIG.STORE_DMS, 'readonly', store => store.index('pair').getAll(dmPair(currentUser(), partner)))
-    .then(messages => (messages || []).sort((a, b) => a.created - b.created));
-}
 
 async function loadDMList() {
-  const list = document.getElementById('dmList');
-  const me = getMe();
-  const myAvatar = document.getElementById('dmMyProfile');
-  if (myAvatar && me) { myAvatar.textContent = me.avatar ? '' : (me.username?.[0] || '?').toUpperCase(); myAvatar.style.backgroundImage = me.avatar ? `url("${me.avatar}")` : ''; }
-  if (!list) return;
-  const conversations = await getConversations();
-  if (!conversations.length) { list.innerHTML = '<div class="empty-state modern-empty"><strong>Belum ada percakapan</strong><span>Cari user lalu mulai ngobrol.</span></div>'; return; }
-  list.innerHTML = conversations.map(item => {
-    const partner = getUserByName(item.partner);
-    const preview = item.last.replyTo ? `↩ ${item.last.text}` : item.last.text;
-    return `<div class="dm-item" data-user="${escapeHtml(item.partner)}">
-      ${avatarHtml(item.partner, 46)}
-      <div class="dm-item-body"><b>@${escapeHtml(item.partner)}</b><p>${escapeHtml(preview).substring(0, 48)}</p><small>${timeAgo(item.last.created)}</small></div>
-      <span class="dm-chevron">›</span>
-    </div>`;
-  }).join('');
-  list.querySelectorAll('.dm-item').forEach(item => item.addEventListener('click', () => openDMChat(item.dataset.user)));
+  await loadDMListOnline();
 }
 
 async function openDMChat(partner) {
-  if (!getUserByName(partner)) return;
-  currentDMPartner = partner;
-  const users = getUsers(); const meUser = users.find(u => String(u.username).toLowerCase() === String(currentUser()).toLowerCase());
-  if (meUser?.notifications) meUser.notifications.forEach(n => { if (n.type === 'dm' && String(n.from).toLowerCase() === String(partner).toLowerCase()) n.read = true; });
-  saveUsers(users); updateNotifBadge(); updateDMBadge();
-  dmReplyTarget = null;
-  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-  document.getElementById('dmChatPage')?.classList.remove('hidden');
-  const user = getUserByName(partner);
-  const avatar = document.getElementById('dmWithAvatar');
-  if (avatar) { avatar.textContent = user?.avatar ? '' : (partner[0] || '?').toUpperCase(); avatar.style.backgroundImage = user?.avatar ? `url("${user.avatar}")` : ''; }
-  document.getElementById('dmWith').textContent = `@${partner}`;
-  document.getElementById('dmWithBio').textContent = user?.bio || 'Siap ngobrol ✨';
-  clearDmReply();
-  await renderDMMessages();
+  await openDMChatOnline(partner);
 }
 
 async function renderDMMessages() {
-  if (!currentDMPartner) return;
-  const messages = await getMessagesWith(currentDMPartner);
-  const box = document.getElementById('dmMessages');
-  const me = currentUser();
-  box.innerHTML = messages.map(message => {
-    const mine = String(message.from).toLowerCase() === String(me).toLowerCase();
-    const reply = message.replyTo;
-    return `<div class="dm-msg-row ${mine ? 'mine' : ''}">
-      ${avatarHtml(message.from, 28)}
-      <div class="dm-msg ${mine ? 'mine' : ''}">
-        ${reply ? `<div class="dm-reply-quote">↩ @${escapeHtml(reply.from)}<br>${escapeHtml(reply.text)}</div>` : ''}
-        <p>${escapeHtml(message.text)}</p>
-        <small>${timeAgo(message.created)}</small>
-        <div class="dm-msg-actions"><button class="ui-action-btn" type="button" data-action="reply-dm" data-id="${message.id}" data-from="${escapeHtml(message.from)}" data-text="${escapeHtml(message.text)}">↩ Balas</button></div>
-      </div>
-    </div>`;
-  }).join('') || '<div class="empty-state modern-empty"><strong>Belum ada pesan</strong><span>Mulai percakapan sekarang.</span></div>';
-  box.querySelectorAll('[data-action="reply-dm"]').forEach(button => button.addEventListener('click', () => setDmReply({ id: Number(button.dataset.id), from: button.dataset.from, text: button.dataset.text })));
-  box.scrollTop = box.scrollHeight;
+  await renderDMMessagesOnline();
 }
 
 function setDmReply(message) {
@@ -296,7 +210,7 @@ function setDmReply(message) {
   const info = document.getElementById('dmReplyInfo');
   const text = document.getElementById('dmReplyText');
   if (info) info.classList.remove('hidden');
-  if (text) text.textContent = `Membalas @${message.from}: ${message.text}`;
+  if (text) text.textContent = `Membalas @${message.from}: ${message.text || 'Foto'}`;
   document.getElementById('dmInput')?.focus();
 }
 
@@ -310,25 +224,23 @@ document.getElementById('cancelDmReply')?.addEventListener('click', clearDmReply
 document.getElementById('dmForm')?.addEventListener('submit', async event => {
   event.preventDefault();
   const input = document.getElementById('dmInput');
+  const fileInput = document.getElementById('dmPhotoInput');
   const sendButton = event.currentTarget.querySelector('button[type=submit]');
   const text = input.value.trim();
-  if (!text || !currentDMPartner) return;
-  if (!getUserByName(currentDMPartner)) { showToast('User tidak ditemukan.', 'error'); return; }
+  const file = fileInput?.files?.[0] || null;
+  if ((!text && !file) || !currentDMPartner) return;
   if (sendButton) sendButton.disabled = true;
   try {
-    await sendDM(currentDMPartner, text, dmReplyTarget ? { id: dmReplyTarget.id, from: dmReplyTarget.from, text: dmReplyTarget.text } : null);
-    input.value = ''; clearDmReply(); await renderDMMessages();
-  } catch (error) { console.error('DM gagal:', error); showToast(error?.name === 'QuotaExceededError' ? 'Penyimpanan perangkat penuh.' : 'Pesan gagal dikirim.', 'error'); }
+    await sendDM(currentDMPartner, text, dmReplyTarget ? { id: dmReplyTarget.id, from: dmReplyTarget.from, text: dmReplyTarget.text || 'Foto', mediaUrl: dmReplyTarget.mediaUrl || '' } : null, file);
+    input.value = ''; if (fileInput) fileInput.value = ''; clearDmReply(); await renderDMMessagesOnline(); await updateDMBadge();
+  } catch (error) { console.error('DM gagal:', error); showToast(error?.message || 'Pesan gagal dikirim.', 'error'); }
   finally { if (sendButton) sendButton.disabled = false; }
 });
 
 document.getElementById('dmBack')?.addEventListener('click', () => {
-  document.getElementById('dmChatPage')?.classList.add('hidden');
-  currentDMPartner = null; clearDmReply(); showTab('tabDM');
+  document.getElementById('dmChatPage')?.classList.add('hidden'); currentDMPartner = null; clearDmReply(); showTab('tabDM');
 });
-document.getElementById('dmProfileBtn')?.addEventListener('click', () => {
-  if (currentDMPartner) openOtherProfile(currentDMPartner);
-});
+document.getElementById('dmProfileBtn')?.addEventListener('click', () => { if (currentDMPartner) openOtherProfile(currentDMPartner); });
 
 /* -------------------- STORY -------------------- */
 let currentStoryUser = null;
