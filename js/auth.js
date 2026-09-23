@@ -63,8 +63,9 @@ function syncLocalShadow(profile) {
     notifications: index >= 0 && Array.isArray(users[index].notifications) ? users[index].notifications : [],
     followers: index >= 0 && Array.isArray(users[index].followers) ? users[index].followers : [],
     following: index >= 0 && Array.isArray(users[index].following) ? users[index].following : [],
-    bannedUntil: 0,
-    banReason: '',
+    role: profile.role || 'user',
+    bannedUntil: profile.banned_until ? new Date(profile.banned_until).getTime() : 0,
+    banReason: profile.ban_reason || '',
     appeal: null,
     created: index >= 0 ? users[index].created : Date.now()
   };
