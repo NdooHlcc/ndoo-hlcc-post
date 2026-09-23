@@ -32,7 +32,7 @@ async function getOnlineProfile() {
   window.__NDOO_AUTH_USER_ID = session.user.id;
   const { data, error } = await initSupabase()
     .from('profiles')
-    .select('id,uid,username,bio,avatar_url,created_at')
+    .select('id,uid,username,bio,avatar_url,role,banned_until,ban_reason,created_at')
     .eq('id', session.user.id)
     .maybeSingle();
   if (error) throw error;
@@ -43,7 +43,7 @@ async function ensureOnlineProfile(authUser, username) {
   const client = initSupabase();
   const { data: existing, error: readError } = await client
     .from('profiles')
-    .select('id,uid,username,bio,avatar_url,created_at')
+    .select('id,uid,username,bio,avatar_url,role,banned_until,ban_reason,created_at')
     .eq('id', authUser.id)
     .maybeSingle();
   if (readError) throw readError;
@@ -53,7 +53,7 @@ async function ensureOnlineProfile(authUser, username) {
   const { data, error } = await client
     .from('profiles')
     .insert({ id: authUser.id, uid, username, bio: '' })
-    .select('id,uid,username,bio,avatar_url,created_at')
+    .select('id,uid,username,bio,avatar_url,role,banned_until,ban_reason,created_at')
     .single();
   if (error) throw error;
   return data;
