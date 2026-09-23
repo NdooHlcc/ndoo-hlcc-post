@@ -3,10 +3,10 @@
    ========================================================= */
 
 const NDOO_CONTACT_LINKS = Object.freeze({
-  contact: 'https://wa.me/+6282228032167',
-  feedback: 'https://wa.me/+6282228032167',
-  report: 'https://wa.me/+6282228032167',
-  donate: 'https://wa.me/+6282228032167'
+  contact: '',
+  feedback: '',
+  report: '',
+  donate: ''
 });
 
 function formatBanUntil(ts) {
@@ -20,74 +20,59 @@ function getBanDurationMs(value, unit) {
   return n * (map[unit] || map.day);
 }
 
-function banUser(username, value, unit, reason) {
+async function banUser(username, value, unit, reason) {
   if (!isAdmin()) return false;
-  const users = getUsers();
-  const target = users.find(user => String(user.username).toLowerCase() === String(username).toLowerCase());
-  if (!target || String(target.username).toLowerCase() === String(NDOO_CONFIG.ADMIN_USER).toLowerCase()) return false;
-  target.bannedUntil = Date.now() + getBanDurationMs(value, unit);
-  target.banReason = reason?.trim() || 'Pelanggaran aturan komunitas.';
-  target.banCreated = Date.now();
-  target.appeal = target.appeal || null;
-  saveUsers(users);
+  await refreshOnlineProfiles();
+  const target = onlineProfileByName(username);
+  if (!target || String(target.id) === String((await getSupabaseSession())?.user?.id)) return false;
+  const until = new Date(Date.now() + getBanDurationMs(value, unit)).toISOString();
+  const { error } = await requireSupabase().rpc('admin_set_ban', { target_user: target.id, until_at: until, reason_text: reason?.trim() || 'Pelanggaran aturan komunitas.' });
+  if (error) throw error;
   return true;
 }
 
-function unbanUser(username) {
+async function unbanUser(username) {
   if (!isAdmin()) return false;
-  const users = getUsers();
-  const target = users.find(user => String(user.username).toLowerCase() === String(username).toLowerCase());
+  await refreshOnlineProfiles();
+  const target = onlineProfileByName(username);
   if (!target) return false;
-  delete target.bannedUntil; delete target.banReason; delete target.banCreated;
-  saveUsers(users);
+  const { error } = await requireSupabase().rpc('admin_unban', { target_user: target.id });
+  if (error) throw error;
   return true;
 }
 
-function renderAdminUsers() {
+async function renderAdminUsers() {
   const box = document.getElementById('adminUserList');
   if (!box) return;
   if (!isAdmin()) { box.innerHTML = '<div class="empty-state">Akses admin diperlukan.</div>'; return; }
-  const users = getUsers().sort((a,b) => String(a.username).localeCompare(String(b.username)));
-  box.innerHTML = users.map(user => {
-    const ban = getBanInfo(user);
-    const isSelf = String(user.username).toLowerCase() === String(currentUser()).toLowerCase();
-    const appeal = user.appeal;
-    return `<article class="admin-user-card" data-admin-user="${escapeHtml(user.username)}">
-      <div class="admin-user-head">${avatarHtml(user.username,42)}<div><b>@${escapeHtml(user.username)}</b><small>${isSelf ? 'Admin aktif' : (ban ? `Diblokir sampai ${formatBanUntil(ban.until)}` : 'Aktif')}</small></div></div>
-      ${ban ? `<div class="ban-state"><b>Alasan:</b> ${escapeHtml(ban.reason)}<br><small>Berakhir: ${escapeHtml(formatBanUntil(ban.until))}</small></div>` : ''}
-      ${appeal ? `<div class="appeal-box"><b>Banding dari @${escapeHtml(user.username)}</b><p>${escapeHtml(appeal.text)}</p><small>${timeAgo(appeal.created)}</small></div>` : ''}
-      <div class="admin-controls">
-        <input type="number" min="1" value="1" data-ban-value aria-label="Durasi ban">
-        <select data-ban-unit aria-label="Satuan durasi"><option value="hour">Jam</option><option value="day" selected>Hari</option><option value="month">Bulan</option><option value="year">Tahun</option></select>
-        <input type="text" data-ban-reason placeholder="Alasan pelanggaran" value="${ban ? escapeHtml(ban.reason) : ''}">
-        <div class="admin-control-actions">
-          <button type="button" class="ui-action-btn admin-ban-btn" ${isSelf ? 'disabled' : ''}>Ban</button>
-          <button type="button" class="ui-action-btn admin-unban-btn">Unban</button>
-          ${appeal ? `<button type="button" class="ui-action-btn admin-appeal-btn">${appeal.read ? 'Banding' : 'Banding Baru'}</button>` : ''}
-        </div>
-      </div>
-    </article>`;
-  }).join('');
-
-  box.querySelectorAll('.admin-user-card').forEach(card => {
-    const username = card.dataset.adminUser;
-    card.querySelector('.admin-ban-btn')?.addEventListener('click', () => {
-      const value = card.querySelector('[data-ban-value]')?.value;
-      const unit = card.querySelector('[data-ban-unit]')?.value;
-      const reason = card.querySelector('[data-ban-reason]')?.value;
-      if (!reason?.trim()) { showToast('Isi alasan pelanggaran terlebih dahulu.', 'error'); return; }
-      if (banUser(username, value, unit, reason)) { showToast(`@${username} diblokir.`, 'success'); renderAdminUsers(); }
+  try {
+    await refreshOnlineProfiles();
+    const client = requireSupabase();
+    const { data, error } = await client.from('profiles').select('id,username,bio,avatar_url,role,banned_until,ban_reason').order('username', { ascending: true });
+    if (error) throw error;
+    const users = data || [];
+    box.innerHTML = users.map(user => {
+      const until = user.banned_until ? new Date(user.banned_until).getTime() : 0;
+      const ban = until > Date.now() ? { until, reason: user.ban_reason || 'Pelanggaran aturan komunitas.' } : null;
+      const isSelf = String(user.id) === String(window.__NDOO_AUTH_USER_ID);
+      return `<article class="admin-user-card" data-admin-user="${escapeHtml(user.username)}"><div class="admin-user-head">${avatarHtml(user.username,42)}<div><b>@${escapeHtml(user.username)}</b><small>${user.role === 'admin' ? 'Admin' : (ban ? `Diblokir sampai ${formatBanUntil(ban.until)}` : 'Aktif')}</small></div></div>${ban ? `<div class="ban-state"><b>Alasan:</b> ${escapeHtml(ban.reason)}<br><small>Berakhir: ${escapeHtml(formatBanUntil(ban.until))}</small></div>` : ''}<div class="admin-controls"><input type="number" min="1" value="1" data-ban-value aria-label="Durasi ban"><select data-ban-unit aria-label="Satuan durasi"><option value="hour">Jam</option><option value="day" selected>Hari</option><option value="month">Bulan</option><option value="year">Tahun</option></select><input type="text" data-ban-reason placeholder="Alasan pelanggaran" value="${ban ? escapeHtml(ban.reason) : ''}"><div class="admin-control-actions"><button type="button" class="ui-action-btn admin-ban-btn" ${isSelf || user.role === 'admin' ? 'disabled' : ''}>Ban</button><button type="button" class="ui-action-btn admin-unban-btn" ${isSelf ? 'disabled' : ''}>Unban</button></div></div></article>`;
+    }).join('');
+    box.querySelectorAll('.admin-user-card').forEach(card => {
+      const username = card.dataset.adminUser;
+      card.querySelector('.admin-ban-btn')?.addEventListener('click', async () => {
+        const value = card.querySelector('[data-ban-value]')?.value;
+        const unit = card.querySelector('[data-ban-unit]')?.value;
+        const reason = card.querySelector('[data-ban-reason]')?.value;
+        if (!reason?.trim()) { showToast('Isi alasan pelanggaran terlebih dahulu.', 'error'); return; }
+        try { if (await banUser(username, value, unit, reason)) { showToast(`@${username} diblokir.`, 'success'); await renderAdminUsers(); } }
+        catch (error) { console.error(error); showToast(error?.message || 'Ban gagal.', 'error'); }
+      });
+      card.querySelector('.admin-unban-btn')?.addEventListener('click', async () => {
+        try { if (await unbanUser(username)) { showToast(`@${username} sudah di-unban.`, 'success'); await renderAdminUsers(); } }
+        catch (error) { console.error(error); showToast(error?.message || 'Unban gagal.', 'error'); }
+      });
     });
-    card.querySelector('.admin-unban-btn')?.addEventListener('click', () => {
-      if (unbanUser(username)) { showToast(`@${username} sudah di-unban.`, 'success'); renderAdminUsers(); }
-    });
-    card.querySelector('.admin-appeal-btn')?.addEventListener('click', () => {
-      const users = getUsers(); const user = users.find(u => u.username === username);
-      if (!user?.appeal) return;
-      user.appeal.read = true; saveUsers(users); renderAdminUsers();
-      showToast(`Banding @${username}: ${user.appeal.text}`, 'info');
-    });
-  });
+  } catch (error) { console.error('Admin users:', error); box.innerHTML = `<div class="empty-state">Data admin gagal dimuat: ${escapeHtml(error?.message || 'error')}</div>`; }
 }
 
 function openAdminPage() {
