@@ -2,11 +2,19 @@
    APP — startup, session gate, dashboard refresh
    ========================================================= */
 
+function resetPageScroll() {
+  // Reset the document scroll when switching between auth and dashboard.
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  if (document.body) document.body.scrollTop = 0;
+}
+
 function hideDashboard() {
   document.getElementById('dashPage')?.classList.add('hidden');
 }
 
 function showAuth() {
+  resetPageScroll();
   closeTransientPages();
   closeInfoDrawer?.();
   hideDashboard();
@@ -30,9 +38,13 @@ function showDashboard() {
     showBanPanel(me, ban);
     return;
   }
+  // Swap the screens, then start the dashboard at its top (not at the
+  // previous login page's scroll offset).
   document.getElementById('authPage')?.classList.add('hidden');
   document.getElementById('dashPage')?.classList.remove('hidden');
+  resetPageScroll();
   showTab('tabPublic');
+  resetPageScroll();
   updateNotifBadge();
   updateDMBadge?.();
 }
