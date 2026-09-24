@@ -32,7 +32,7 @@ async function loadTab(tabId) {
     else if (tabId === 'tabProfile') await loadMyProfile();
     else if (tabId === 'tabDM') await loadDMList();
     else if (tabId === 'tabNotif') loadNotifications();
-  } catch (error) { console.error(`Gagal memuat ${tabId}:`, error); }
+  } catch (error) { console.error(`Gagal memuat ${tabId}:`, error); showToast?.(error?.message || `Gagal memuat ${tabId}.`, 'error'); }
 }
 
 function initRouter() {
