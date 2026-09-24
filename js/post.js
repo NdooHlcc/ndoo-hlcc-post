@@ -84,16 +84,17 @@ document.getElementById('postSubmit')?.addEventListener('click', async () => {
     if (!postMediaData || !postMediaFile) { msg.textContent = 'Pilih foto/video dulu.'; return; }
     if (vip && !isAdmin()) { msg.textContent = 'Hanya admin yang bisa posting VIP.'; return; }
 
-    await createOnlinePost({ caption, media: postMediaData, mediaFile: postMediaFile, mediaType: postMediaType });
+    const createdPost = await createOnlinePost({ caption, media: postMediaData, mediaFile: postMediaFile, mediaType: postMediaType });
+    if (!createdPost?.id) throw new Error('Postingan tersimpan tanpa ID database. Coba lagi.');
 
     msg.style.color = 'var(--accent2)';
     msg.textContent = 'Postingan berhasil diunggah!';
-    setTimeout(() => {
+    setTimeout(async () => {
       document.getElementById('postPage').classList.add('hidden');
       msg.style.color = '';
       editingPostId = null;
       showTab('tabPublic');
-      refreshAll();
+      await loadFeed();
     }, 700);
   } catch (error) {
     console.error('Post gagal:', error);
