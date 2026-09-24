@@ -491,28 +491,42 @@ async function markDMRead(partner) {
 
 let onlineSyncTimer = null;
 let onlineSyncChannel = null;
+let onlineSyncBusy = false;
+let lastDMFingerprint = '';
+
+
 async function initOnlineSync() {
   if (onlineSyncTimer) clearInterval(onlineSyncTimer);
   onlineSyncTimer = setInterval(async () => {
-    if (document.hidden || !currentUser()) return;
+    if (document.hidden || !currentUser() || onlineSyncBusy) return;
+    onlineSyncBusy = true;
     try {
-      await updateDMBadge();
-      await updateNotifBadge();
-      await syncFollowShadows();
+      await Promise.allSettled([updateDMBadge(), updateNotifBadge()]);
       if (currentDMPartner) await renderDMMessagesOnline();
-      if (document.getElementById('tabDM') && !document.getElementById('tabDM').classList.contains('hidden')) await loadDMListOnline();
+      const active = document.querySelector('.nav-btn.active')?.dataset.tab;
+      if (active === 'tabDM' && !currentDMPartner) await loadDMListOnline();
     } catch (error) { console.warn('Online sync:', error); }
-  }, 2500);
+    finally { onlineSyncBusy = false; }
+  }, 1200);
   try {
     const client = requireSupabase();
     onlineSyncChannel?.unsubscribe?.();
-    onlineSyncChannel = client.channel('ndoo-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, async () => {
+    const meId = (await getSupabaseSession())?.user?.id;
+    onlineSyncChannel = client.channel(`ndoo-live-${meId || 'guest'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, async payload => {
+        const row = payload?.new || payload?.old || {};
+        if (meId && row.sender_id !== meId && row.receiver_id !== meId) return;
         await updateDMBadge();
         if (currentDMPartner) await renderDMMessagesOnline();
-        await loadDMListOnline().catch(() => {});
+        const active = document.querySelector('.nav-btn.active')?.dataset.tab;
+        if (active === 'tabDM') await loadDMListOnline().catch(() => {});
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, async () => { await syncFollowShadows(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, async () => {
+        await syncFollowShadows().catch(() => {});
+        const active = document.querySelector('.nav-btn.active')?.dataset.tab;
+        if (active === 'tabProfile') await loadMyProfile().catch(() => {});
+        if (viewingUser && active === 'tabOtherProfile') await openOtherProfile(viewingUser).catch(() => {});
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, async () => {
         const active = document.querySelector('.nav-btn.active')?.dataset.tab;
         if (active === 'tabPublic') await loadFeed().catch(() => {});
@@ -536,7 +550,7 @@ async function loadDMListOnline() {
   list.innerHTML = conversations.map(item => {
     const partner = item.partner;
     const unread = unreadByPartner.get(item.last.senderId === session?.user?.id ? item.last.receiverId : item.last.senderId) || 0;
-    const preview = item.last.mediaUrl ? '📷 Foto' : (item.last.replyTo ? `↩ ${item.last.text}` : item.last.text);
+    const preview = item.last.mediaUrl ? 'Foto' : (item.last.replyTo ? `Balasan: ${item.last.text}` : item.last.text);
     return `<div class="dm-item" data-user="${escapeHtml(partner)}">${avatarHtml(partner,46)}<div class="dm-item-body"><b>@${escapeHtml(partner)}</b><p>${escapeHtml(preview).substring(0,48)}</p><small>${timeAgo(item.last.created)}</small></div>${unread ? `<span class="dm-conv-badge">${unread > 99 ? '99+' : unread}</span>` : ''}<span class="dm-chevron">›</span></div>`;
   }).join('');
   list.querySelectorAll('.dm-item').forEach(item => item.addEventListener('click', () => openDMChatOnline(item.dataset.user)));
@@ -546,6 +560,7 @@ async function openDMChatOnline(partner) {
   const target = onlineProfileByName(partner) || getUserByName(partner);
   if (!target) { showToast('User tidak ditemukan.', 'error'); return; }
   currentDMPartner = target.username;
+  lastDMFingerprint = '';
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
   document.getElementById('dmChatPage')?.classList.remove('hidden');
   const me = getMe();
@@ -553,7 +568,7 @@ async function openDMChatOnline(partner) {
   const avatar = document.getElementById('dmWithAvatar');
   if (avatar) { avatar.textContent = user.avatar ? '' : (user.username?.[0] || '?').toUpperCase(); avatar.style.backgroundImage = user.avatar ? `url("${user.avatar}")` : ''; }
   document.getElementById('dmWith').textContent = `@${user.username}`;
-  document.getElementById('dmWithBio').textContent = user.bio || 'Siap ngobrol ✨';
+  document.getElementById('dmWithBio').textContent = user.bio || 'Siap ngobrol ';
   clearDmReply();
   await markDMRead(user.username);
   await renderDMMessagesOnline();
@@ -565,6 +580,9 @@ async function renderDMMessagesOnline() {
   const box = document.getElementById('dmMessages');
   const meId = (await getSupabaseSession())?.user?.id;
   if (!box) return;
+  const fingerprint = messages.map(message => `${message.id}:${message.read ? 1 : 0}`).join('|');
+  if (fingerprint === lastDMFingerprint && box.childElementCount) return;
+  lastDMFingerprint = fingerprint;
   box.innerHTML = messages.map(message => {
     const mine = message.senderId === meId;
     const reply = message.replyTo;
@@ -595,12 +613,24 @@ function openDMPhoto(url) {
   let modal = document.getElementById('dmPhotoViewer');
   if (!modal) {
     modal = document.createElement('div'); modal.id = 'dmPhotoViewer'; modal.className = 'dm-photo-viewer';
-    modal.innerHTML = `<button type="button" class="dm-photo-close">×</button><img id="dmPhotoViewerImg" alt="Foto pesan"><a id="dmPhotoDownload" class="ui-action-btn" download>Simpan ke galeri</a>`;
+    modal.innerHTML = `<button type="button" class="dm-photo-close" aria-label="Tutup">×</button><img id="dmPhotoViewerImg" alt="Foto pesan"><button id="dmPhotoDownload" class="ui-action-btn" type="button">Simpan ke galeri</button>`;
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal || e.target.classList.contains('dm-photo-close')) modal.classList.remove('open'); });
+    modal.querySelector('#dmPhotoDownload')?.addEventListener('click', async () => {
+      const imageUrl = document.getElementById('dmPhotoViewerImg')?.src;
+      if (!imageUrl) return;
+      try {
+        const response = await fetch(imageUrl, { mode: 'cors', cache: 'no-store' });
+        if (!response.ok) throw new Error('Foto tidak dapat diambil.');
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = objectUrl; a.download = 'ndoo-chat-photo.' + ((blob.type.split('/')[1] || 'jpg').split(';')[0]);
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+      } catch { window.open(imageUrl, '_blank', 'noopener'); }
+    });
   }
   document.getElementById('dmPhotoViewerImg').src = url;
-  const download = document.getElementById('dmPhotoDownload'); download.href = url; download.setAttribute('download','ndoo-chat-photo');
   modal.classList.add('open');
 }
 
