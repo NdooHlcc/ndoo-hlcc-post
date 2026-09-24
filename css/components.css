@@ -1583,3 +1583,45 @@ body:not(.light) .post-menu-btn{background:rgba(255,255,255,.055)!important;bord
 /* V3.8.2 online chat polish */
 .dm-compose-row{display:flex;align-items:center;gap:7px;width:100%}.dm-compose-row #dmInput{flex:1;min-width:0}.dm-photo-pick{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;cursor:pointer;background:var(--panel2);border:1px solid var(--border);font-size:18px}.dm-photo-pick:active{transform:scale(.94)}
 .dm-conv-badge{min-width:19px;height:19px;padding:0 5px;border-radius:999px;display:grid;place-items:center;background:#ff4d5d;color:#fff;font-size:9px;font-weight:900}.dm-photo-btn{display:block;border:0;padding:0;margin:0;background:none;max-width:min(240px,72vw);cursor:pointer;border-radius:14px;overflow:hidden}.dm-photo{display:block;width:auto;height:auto;max-width:100%;max-height:280px;object-fit:contain;border-radius:14px}.dm-ticks{margin-left:3px;font-weight:900;letter-spacing:-2px}.dm-ticks.read{color:#1788ff}.dm-photo-viewer{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:20px;background:rgba(0,0,0,.88);backdrop-filter:blur(10px)}.dm-photo-viewer.open{display:flex}.dm-photo-viewer img{max-width:94vw;max-height:78vh;object-fit:contain;border-radius:14px}.dm-photo-viewer .dm-photo-close{position:absolute;right:16px;top:14px;width:42px;height:42px;border:0;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;font-size:28px}.dm-photo-viewer .ui-action-btn{width:auto!important;margin:0!important;text-decoration:none;color:#111;background:#b7ff2a!important;padding:10px 15px!important}
+
+
+/* ===== V3.8.3 UX / CHAT / ONLINE MUSIC ===== */
+.auth-page{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:100svh!important;padding:24px 14px!important}
+.auth-shell{width:min(100%,430px)!important;margin:0 auto!important}
+.auth-box{width:100%!important;margin:0 auto!important}
+.home-profile-card{cursor:pointer}
+.home-profile-card .soft-btn{position:relative;z-index:2}
+.dm-messages{scroll-behavior:smooth!important;overscroll-behavior:contain!important}
+.dm-msg-row{width:100%!important;display:flex!important;justify-content:flex-start!important;align-items:flex-end!important;gap:7px!important;margin:4px 0!important}
+.dm-msg-row.mine{justify-content:flex-end!important}
+.dm-msg{max-width:min(78%,360px)!important;cursor:pointer!important;transform-origin:center!important;transition:transform .18s ease,box-shadow .18s ease!important}
+.dm-msg:active{transform:scale(.975)!important}
+.dm-msg.mine{margin-left:auto!important}
+.dm-photo-btn{max-width:min(230px,68vw)!important;display:block!important}
+.dm-photo{width:auto!important;height:auto!important;max-width:100%!important;max-height:250px!important;object-fit:contain!important}
+.chat-form{padding:8px!important}
+.dm-compose-row{align-items:flex-end!important;gap:7px!important}
+.dm-photo-pick,.chat-form .dm-compose-row>button{flex:0 0 42px!important;width:42px!important;height:42px!important;display:grid!important;place-items:center!important;border-radius:13px!important}
+.dm-photo-pick{color:var(--text)!important}
+#dmInput{min-height:42px!important;max-height:120px!important;resize:none!important;overflow-y:auto!important;line-height:1.35!important;padding:10px 13px!important;border-radius:15px!important;box-sizing:border-box!important}
+.dm-photo-preview{padding:4px 4px 7px!important}
+.dm-preview-card{display:flex!important;align-items:center!important;gap:9px!important;padding:7px!important;border-radius:14px!important;background:var(--panel2)!important;border:1px solid var(--border)!important;max-width:min(100%,340px)!important}
+.dm-preview-card img{width:58px!important;height:58px!important;border-radius:10px!important;object-fit:cover!important}
+.dm-preview-copy{min-width:0!important;display:flex!important;flex-direction:column!important;gap:2px!important;flex:1!important}.dm-preview-copy b{font-size:11px!important}.dm-preview-copy small{font-size:9px!important;color:var(--muted)!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+.dm-preview-card>button{width:30px!important;height:30px!important;border:0!important;border-radius:9px!important;background:rgba(255,255,255,.08)!important;color:var(--muted)!important}
+.dm-reply-pop{animation:dmReplyPop .32s ease both!important}
+@keyframes dmReplyPop{0%{transform:scale(.94);opacity:.55}55%{transform:scale(1.03);opacity:1}100%{transform:scale(1)}}
+.dm-reply-quote{border-left:3px solid var(--lime)!important;padding:5px 8px!important;margin-bottom:5px!important;border-radius:7px!important;background:rgba(183,255,42,.07)!important;font-size:10px!important}
+.dm-badge.hidden{display:none!important}
+.dm-conv-badge{display:grid!important}
+.dm-photo-viewer{padding:18px!important}
+.dm-photo-viewer img{max-width:95vw!important;max-height:76vh!important}
+.music-online-search{margin:12px 0 14px!important;padding:10px!important;border:1px solid var(--border)!important;border-radius:16px!important;background:var(--panel)!important}
+.music-search-row{display:flex!important;align-items:center!important;gap:7px!important}.music-search-row svg{flex:0 0 auto!important;color:var(--muted)!important}.music-search-row input{flex:1!important;min-width:0!important;height:42px!important;border:1px solid var(--border)!important;border-radius:12px!important;background:var(--panel2)!important;color:var(--text)!important;padding:0 11px!important}.music-search-row button{height:42px!important;padding:0 13px!important;border:0!important;border-radius:12px!important;background:var(--accent)!important;color:#102008!important;font-weight:800!important}
+.music-genre-chips{display:flex!important;gap:6px!important;overflow-x:auto!important;padding-top:8px!important;scrollbar-width:none!important}.music-genre-chips::-webkit-scrollbar{display:none}.music-genre-chips button{flex:0 0 auto!important;border:1px solid var(--border)!important;background:var(--panel2)!important;color:var(--text)!important;border-radius:999px!important;padding:7px 10px!important;font-size:10px!important;font-weight:700!important}
+.music-online-list{display:flex!important;flex-direction:column!important;gap:7px!important}.music-online-track{display:grid!important;grid-template-columns:46px minmax(0,1fr) 38px!important;gap:9px!important;align-items:center!important;padding:8px!important;border-radius:15px!important;border:1px solid var(--border)!important;background:var(--panel)!important}.music-online-cover{width:46px!important;height:46px!important;border-radius:11px!important;overflow:hidden!important;display:grid!important;place-items:center!important;background:var(--panel2)!important;color:var(--accent)!important;font-weight:900!important}.music-online-cover img{width:100%!important;height:100%!important;object-fit:cover!important}.music-online-info{min-width:0!important;display:flex!important;flex-direction:column!important;gap:3px!important}.music-online-info b{font-size:11px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}.music-online-info small{font-size:9px!important;color:var(--muted)!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}.music-online-play{width:36px!important;height:36px!important;border:0!important;border-radius:11px!important;background:rgba(183,255,42,.12)!important;color:var(--accent)!important;font-weight:800!important}.music-online-loading{padding:16px;text-align:center;color:var(--muted);font-size:11px}
+.music-player-cover img{width:100%!important;height:100%!important;border-radius:inherit!important;object-fit:cover!important}
+@media(max-width:600px){.auth-shell{width:min(100%,410px)!important}.auth-box{padding:22px!important}.dm-msg{max-width:82%!important}.dm-photo{max-height:220px!important}.music-search-row input{font-size:12px!important}.music-search-row button{padding:0 11px!important}}
+
+.dm-reply-selected{animation:dmBubbleSelect .42s ease both!important}
+@keyframes dmBubbleSelect{0%{transform:scale(1)}35%{transform:scale(.94)}68%{transform:scale(1.04)}100%{transform:scale(1)}}
