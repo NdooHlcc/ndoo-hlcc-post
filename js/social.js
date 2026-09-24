@@ -3,8 +3,10 @@
    ========================================================= */
 
 async function loadFeed() {
-  if (!db) return;
-  const me = getMe();
+  await refreshOnlineProfiles().catch(() => {});
+  const onlineMe = await getOnlineProfile().catch(() => null);
+  if (onlineMe) syncLocalShadow(onlineMe);
+  const me = onlineMe ? { ...getMe(), bio: onlineMe.bio || '', avatar: onlineMe.avatar_url || '' } : getMe();
   const homeName = document.getElementById('homeProfileName');
   const homeBio = document.getElementById('homeProfileBio');
   const homeAvatar = document.getElementById('homeProfileAvatar');
@@ -19,12 +21,15 @@ async function loadFeed() {
   const feed = document.getElementById('feedList');
   if (!feed) return;
   if (!list.length) {
-    feed.innerHTML = '<div class="empty-state modern-empty"><strong>Belum ada postingan</strong><span>Jadilah yang pertama membagikan sesuatu ✨</span></div>';
+    feed.innerHTML = '<div class="empty-state modern-empty"><strong>Belum ada postingan</strong><span>Jadilah yang pertama membagikan sesuatu </span></div>';
     return;
   }
   feed.innerHTML = list.map(post => renderPost(post, currentUser())).join('');
   bindPostEvents(feed);
-  document.getElementById('homeProfileBtn')?.addEventListener('click', () => showTab('tabProfile'), { once: true });
+  const homeCard = document.getElementById('homeProfileCard');
+  if (homeCard) homeCard.onclick = () => showTab('tabProfile');
+  const homeButton = document.getElementById('homeProfileBtn');
+  if (homeButton) homeButton.onclick = event => { event.stopPropagation(); showTab('tabProfile'); };
 }
 
 function renderPost(post, me) {
@@ -93,8 +98,13 @@ async function loadMyProfile() {
   document.getElementById('profName').textContent = `@${profile.username}`;
   document.getElementById('profBio').textContent = profile.bio || 'Belum ada bio.';
   setProfileAvatar(document.getElementById('avatar'), { ...me, avatar: profile.avatar_url || me.avatar, username: profile.username });
-  document.getElementById('statFollowers').textContent = me.followers?.length || 0;
-  document.getElementById('statFollowing').textContent = me.following?.length || 0;
+  const client = requireSupabase();
+  const [followersRes, followingRes] = await Promise.all([
+    client.from('follows').select('follower_id', { count: 'exact', head: true }).eq('following_id', profile.id),
+    client.from('follows').select('following_id', { count: 'exact', head: true }).eq('follower_id', profile.id)
+  ]);
+  document.getElementById('statFollowers').textContent = Number(followersRes.count || 0);
+  document.getElementById('statFollowing').textContent = Number(followingRes.count || 0);
   const mine = (await getAllPosts()).filter(post => String(post.userId) === String(profile.id)).sort((a, b) => b.created - a.created);
   document.getElementById('statPosts').textContent = mine.length;
   document.getElementById('statLikes').textContent = mine.reduce((total, post) => total + (post.likes?.length || 0), 0);
@@ -107,7 +117,7 @@ function renderProfileGrid(posts) {
   return `<div class="profile-post-grid">${posts.map(post => `
     <div class="profile-post-tile" role="button" tabindex="0" data-action="profile-post" data-id="${post.id}">
       ${post.mediaType === 'image' ? `<img src="${post.media}" alt="Postingan" loading="lazy" decoding="async">` : `<video muted preload="metadata" playsinline src="${post.media}"></video>`}
-      <span class="tile-meta">♡ ${post.likes?.length || 0} · 💬 ${countCommentTree(post.comments || [])}</span>
+      <span class="tile-meta">♡ ${post.likes?.length || 0} · Komentar ${countCommentTree(post.comments || [])}</span>
     </div>`).join('')}</div>`;
 }
 
@@ -142,9 +152,14 @@ async function openOtherProfile(username) {
   document.getElementById('oName2').textContent = username;
   document.getElementById('oBio').textContent = targetProfile.bio || 'Belum ada bio.';
   setProfileAvatar(document.getElementById('oAvatar'), { ...target, avatar: targetProfile.avatar_url || target.avatar, username });
-  document.getElementById('oFollowers').textContent = target.followers?.length || 0;
-  document.getElementById('oFollowing').textContent = target.following?.length || 0;
-  const following = self?.following?.some(name => String(name).toLowerCase() === String(username).toLowerCase());
+  const client = requireSupabase();
+  const [followersRes, followingRes] = await Promise.all([
+    client.from('follows').select('follower_id', { count: 'exact', head: true }).eq('following_id', targetProfile.id),
+    client.from('follows').select('following_id', { count: 'exact', head: true }).eq('follower_id', targetProfile.id)
+  ]);
+  document.getElementById('oFollowers').textContent = Number(followersRes.count || 0);
+  document.getElementById('oFollowing').textContent = Number(followingRes.count || 0);
+  const following = !!(await client.from('follows').select('follower_id').eq('follower_id', (await getSupabaseSession()).user.id).eq('following_id', targetProfile.id).maybeSingle()).data;
   const followButton = document.getElementById('followBtn');
   followButton.textContent = following ? 'Unfollow' : 'Follow';
   followButton.onclick = async () => { try { await toggleFollowOnline(username); } catch (e) { console.error(e); showToast('Follow gagal.', 'error'); } };
@@ -169,19 +184,28 @@ async function toggleFollow(targetUser) {
 
 async function openPeoplePage(type, username) {
   await refreshOnlineProfiles().catch(() => {});
-  await syncFollowShadows().catch(() => {});
   const name = username === 'me' ? currentUser() : (viewingUser || username);
   const target = onlineProfileByName(name) || getUserByName(name);
   if (!target) return;
   closeTransientPages();
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-  const page = document.getElementById('peoplePage'); page?.classList.remove('hidden');
-  document.getElementById('peopleTitle').textContent = type === 'followers' ? `Pengikut @${target.username}` : `Mengikuti @${target.username}`;
-  const localTarget = getUserByName(target.username) || target;
-  const names = type === 'followers' ? (localTarget.followers || []) : (localTarget.following || []);
+  document.getElementById('peoplePage')?.classList.remove('hidden');
+  const title = type === 'followers' ? `Pengikut @${target.username}` : `Mengikuti @${target.username}`;
+  document.getElementById('peopleTitle').textContent = title;
   const list = document.getElementById('peopleList');
-  list.innerHTML = names.length ? names.map(name => `<div class="search-user" data-user="${escapeHtml(name)}">${avatarHtml(name,44)}<div class="search-user-info"><b>@${escapeHtml(name)}</b><p>${escapeHtml(getUserByName(name)?.bio || onlineProfileByName(name)?.bio || 'Belum ada bio')}</p></div></div>`).join('') : '<div class="empty-state">Belum ada data.</div>';
-  list.querySelectorAll('[data-user]').forEach(item => item.addEventListener('click', () => { page?.classList.add('hidden'); openOtherProfile(item.dataset.user); }));
+  list.innerHTML = '<div class="empty-state">Memuat...</div>';
+  const session = await getSupabaseSession();
+  const client = requireSupabase();
+  const column = type === 'followers' ? 'follower_id' : 'following_id';
+  const filterColumn = type === 'followers' ? 'following_id' : 'follower_id';
+  const { data: rows, error } = await client.from('follows').select(`${column}`).eq(filterColumn, target.id);
+  if (error) throw error;
+  const ids = (rows || []).map(row => row[column]).filter(Boolean);
+  if (!ids.length) { list.innerHTML = '<div class="empty-state">Belum ada data.</div>'; return; }
+  const { data: profiles, error: profileError } = await client.from('profiles').select('id,username,bio,avatar_url').in('id', ids).order('username');
+  if (profileError) throw profileError;
+  list.innerHTML = (profiles || []).map(profile => `<div class="search-user" data-user="${escapeHtml(profile.username)}">${avatarHtml(profile.username,44)}<div class="search-user-info"><b>@${escapeHtml(profile.username)}</b><p>${escapeHtml(profile.bio || 'Belum ada bio')}</p></div></div>`).join('');
+  list.querySelectorAll('[data-user]').forEach(item => item.addEventListener('click', () => { document.getElementById('peoplePage')?.classList.add('hidden'); openOtherProfile(item.dataset.user); }));
 }
 
 document.querySelectorAll('.stat-click').forEach(button => button.addEventListener('click', () => openPeoplePage(button.dataset.peopleType, button.dataset.peopleUser)));
@@ -209,8 +233,8 @@ function setDmReply(message) {
   dmReplyTarget = message;
   const info = document.getElementById('dmReplyInfo');
   const text = document.getElementById('dmReplyText');
-  if (info) info.classList.remove('hidden');
-  if (text) text.textContent = `Membalas @${message.from}: ${message.text || 'Foto'}`;
+  if (info) { info.classList.remove('hidden'); info.classList.add('dm-reply-pop'); setTimeout(() => info.classList.remove('dm-reply-pop'), 320); }
+  if (text) text.textContent = `@${message.from}: ${message.text || 'Foto'}`;
   document.getElementById('dmInput')?.focus();
 }
 
@@ -220,6 +244,29 @@ function clearDmReply() {
 }
 
 document.getElementById('cancelDmReply')?.addEventListener('click', clearDmReply);
+
+function syncDmInputHeight() {
+  const input = document.getElementById('dmInput');
+  if (!input) return;
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(120, Math.max(40, input.scrollHeight))}px`;
+}
+
+function renderDmPhotoPreview(file) {
+  const box = document.getElementById('dmPhotoPreview');
+  if (!box) return;
+  if (!file) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+  const url = URL.createObjectURL(file);
+  box.innerHTML = `<div class="dm-preview-card"><img src="${url}" alt="Preview foto"><div class="dm-preview-copy"><b>Foto siap dikirim</b><small>${escapeHtml(file.name || 'Foto')}</small></div><button type="button" id="dmPreviewRemove" aria-label="Hapus foto">×</button></div>`;
+  box.classList.remove('hidden');
+  document.getElementById('dmPreviewRemove')?.addEventListener('click', () => {
+    const input = document.getElementById('dmPhotoInput'); if (input) input.value = '';
+    URL.revokeObjectURL(url); renderDmPhotoPreview(null);
+  });
+}
+
+document.getElementById('dmInput')?.addEventListener('input', syncDmInputHeight);
+document.getElementById('dmPhotoInput')?.addEventListener('change', event => renderDmPhotoPreview(event.target.files?.[0] || null));
 
 document.getElementById('dmForm')?.addEventListener('submit', async event => {
   event.preventDefault();
@@ -232,7 +279,8 @@ document.getElementById('dmForm')?.addEventListener('submit', async event => {
   if (sendButton) sendButton.disabled = true;
   try {
     await sendDM(currentDMPartner, text, dmReplyTarget ? { id: dmReplyTarget.id, from: dmReplyTarget.from, text: dmReplyTarget.text || 'Foto', mediaUrl: dmReplyTarget.mediaUrl || '' } : null, file);
-    input.value = ''; if (fileInput) fileInput.value = ''; clearDmReply(); await renderDMMessagesOnline(); await updateDMBadge();
+    input.value = ''; syncDmInputHeight(); if (fileInput) fileInput.value = ''; renderDmPhotoPreview(null); clearDmReply();
+    await Promise.allSettled([renderDMMessagesOnline(), updateDMBadge(), loadDMListOnline()]);
   } catch (error) { console.error('DM gagal:', error); showToast(error?.message || 'Pesan gagal dikirim.', 'error'); }
   finally { if (sendButton) sendButton.disabled = false; }
 });
@@ -446,7 +494,7 @@ function renderAIChat() {
   if (!box) return;
   box.innerHTML = '';
   if (!aiHistory.length) {
-    box.innerHTML = '<div class="ai-message ai-message-bot"><div class="ai-avatar">N</div><div class="ai-bubble"><strong>AI NdooHlcc</strong><p>Yo Bos 👋 Mau ngerjain apa hari ini?</p></div></div>';
+    box.innerHTML = '<div class="ai-message ai-message-bot"><div class="ai-avatar">N</div><div class="ai-bubble"><strong>AI NdooHlcc</strong><p>Yo Bos  Mau ngerjain apa hari ini?</p></div></div>';
     return;
   }
   aiHistory.forEach(item => appendAIMessage(item.role, item.text, false));
@@ -645,6 +693,69 @@ function openMusicPage() {
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
   document.getElementById('musicPage')?.classList.remove('hidden');
   loadMusicList().catch(error => console.error('Music load:', error));
+  searchOnlineMusic('DJ').catch(() => {});
+}
+
+
+/* -------------------- ONLINE MUSIC -------------------- */
+let musicOnlineHost = 'https://discoveryprovider.audius.co';
+let musicOnlineResults = [];
+let musicOnlineCurrentId = null;
+
+async function getAudiusHost() {
+  try {
+    const response = await fetch('https://api.audius.co', { cache: 'no-store' });
+    if (response.ok) {
+      const hosts = await response.json();
+      if (Array.isArray(hosts) && hosts.length) musicOnlineHost = hosts[Math.floor(Math.random() * hosts.length)];
+    }
+  } catch {}
+  return musicOnlineHost;
+}
+
+async function searchOnlineMusic(query = '') {
+  const box = document.getElementById('musicOnlineList');
+  if (!box) return;
+  const q = String(query || '').trim();
+  box.innerHTML = '<div class="music-online-loading">Mencari musik...</div>';
+  try {
+    const host = await getAudiusHost();
+    const endpoint = `${host}/v1/tracks/${q ? 'search' : 'trending'}?app_name=${encodeURIComponent(NDOO_CONFIG.AUDIO_ONLINE_APP_NAME)}&limit=18${q ? `&query=${encodeURIComponent(q)}` : ''}`;
+    const response = await fetch(endpoint, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Server musik merespons ${response.status}.`);
+    const json = await response.json();
+    musicOnlineResults = Array.isArray(json?.data) ? json.data.filter(track => track?.is_streamable !== false && track?.isStreamable !== false) : [];
+    if (!musicOnlineResults.length) { box.innerHTML = '<div class="empty-state">Musik tidak ditemukan.</div>'; return; }
+    box.innerHTML = musicOnlineResults.map((track, index) => {
+      const cover = track.artwork?._150x150 || track.artwork?.['150x150'] || track.artwork?._480x480 || '';
+      const artist = track.user?.name || track.user?.handle || 'Artis';
+      return `<article class="music-online-track" data-online-music="${escapeHtml(String(track.id))}"><div class="music-online-cover">${cover ? `<img src="${escapeHtml(cover)}" alt="">` : '<span>N</span>'}</div><div class="music-online-info"><b>${escapeHtml(track.title || 'Tanpa judul')}</b><small>${escapeHtml(artist)}${track.genre ? ` · ${escapeHtml(track.genre)}` : ''}</small></div><button type="button" class="music-online-play" data-online-play="${escapeHtml(String(track.id))}" aria-label="Putar">▶</button></article>`;
+    }).join('');
+    box.querySelectorAll('[data-online-play]').forEach(btn => btn.addEventListener('click', () => playOnlineMusic(btn.dataset.onlinePlay)));
+  } catch (error) {
+    console.error('Online music:', error);
+    box.innerHTML = `<div class="empty-state">Musik online gagal dimuat. ${escapeHtml(error?.message || '')}</div>`;
+  }
+}
+
+async function playOnlineMusic(id) {
+  const track = musicOnlineResults.find(item => String(item.id) === String(id));
+  if (!track) return;
+  const audio = document.getElementById('globalAudio');
+  if (!audio) return;
+  const host = await getAudiusHost();
+  const streamUrl = `${host}/v1/tracks/${encodeURIComponent(track.id)}/stream?app_name=${encodeURIComponent(NDOO_CONFIG.AUDIO_ONLINE_APP_NAME)}`;
+  musicOnlineCurrentId = String(track.id);
+  currentMusicId = null;
+  audio.src = streamUrl;
+  audio.dataset.musicSource = 'online';
+  document.getElementById('musicPlayerTitle').textContent = track.title || 'Tanpa judul';
+  document.getElementById('musicPlayerMeta').textContent = track.user?.name || track.user?.handle || 'Musik online';
+  const cover = track.artwork?._150x150 || track.artwork?.['150x150'] || '';
+  const coverBox = document.getElementById('musicPlayerCover');
+  coverBox.innerHTML = cover ? `<img src="${escapeHtml(cover)}" alt="">` : 'N';
+  document.getElementById('musicPlayer')?.classList.remove('hidden');
+  try { await audio.play(); } catch (error) { console.warn('Playback musik online:', error); showToast('Tekan tombol play untuk memulai musik.', 'info'); }
 }
 
 function initMusic() {
@@ -654,6 +765,12 @@ function initMusic() {
   if (!button || !file) return;
   musicEventsBound = true;
   button.addEventListener('click', openMusicPage);
+  const onlineInput = document.getElementById('musicOnlineSearch');
+  const onlineSearchBtn = document.getElementById('musicOnlineSearchBtn');
+  const runOnlineSearch = () => searchOnlineMusic(onlineInput?.value || '');
+  onlineSearchBtn?.addEventListener('click', runOnlineSearch);
+  onlineInput?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); runOnlineSearch(); } });
+  document.querySelectorAll('[data-music-query]').forEach(chip => chip.addEventListener('click', () => { if (onlineInput) onlineInput.value = chip.dataset.musicQuery || ''; runOnlineSearch(); }));
   document.getElementById('musicBack')?.addEventListener('click', () => { document.getElementById('musicPage')?.classList.add('hidden'); showTab('tabPublic'); });
   document.getElementById('musicAddBtn')?.addEventListener('click', () => file.click());
   const floatBtn = document.getElementById('musicFloatBtn');
