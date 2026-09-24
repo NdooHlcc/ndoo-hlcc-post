@@ -36,6 +36,7 @@ async function getOnlineProfile() {
     .eq('id', session.user.id)
     .maybeSingle();
   if (error) throw error;
+  window.__NDOO_PROFILE_ROLE = data?.role || 'user';
   return data;
 }
 
