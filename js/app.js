@@ -37,9 +37,10 @@ function showDashboard() {
   updateDMBadge?.();
 }
 
-function refreshAll() {
+async function refreshAll() {
   const active = document.querySelector('.nav-btn.active')?.dataset.tab || 'tabPublic';
-  return loadTab(active);
+  try { return await loadTab(active); }
+  catch (error) { console.error('Refresh gagal:', error); showToast(error?.message || 'Data gagal dimuat.', 'error'); }
 }
 
 window.addEventListener('error', event => {
