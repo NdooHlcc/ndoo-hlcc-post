@@ -47,7 +47,7 @@ function getBanInfo(user) {
 
 function isAdmin() {
   const me = getMe();
-  return String(me?.role || '').toLowerCase() === 'admin' || String(currentUser() || '').toLowerCase() === String(NDOO_CONFIG.ADMIN_USER).toLowerCase();
+  return String(me?.role || '').toLowerCase() === 'admin' || String(window.__NDOO_PROFILE_ROLE || '').toLowerCase() === 'admin';
 }
 
 function simpleHash(value) {
