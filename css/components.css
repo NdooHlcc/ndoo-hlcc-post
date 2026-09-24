@@ -1625,3 +1625,9 @@ body:not(.light) .post-menu-btn{background:rgba(255,255,255,.055)!important;bord
 
 .dm-reply-selected{animation:dmBubbleSelect .42s ease both!important}
 @keyframes dmBubbleSelect{0%{transform:scale(1)}35%{transform:scale(.94)}68%{transform:scale(1.04)}100%{transform:scale(1)}}
+
+
+/* FIX: ensure auth page is actually hidden after successful login. */
+.auth-page.hidden,
+#authPage.hidden,
+.page.hidden { display: none !important; }
