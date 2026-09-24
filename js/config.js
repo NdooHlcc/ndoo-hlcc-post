@@ -18,7 +18,8 @@ const NDOO_CONFIG = Object.freeze({
   STORY_TTL: 24 * 60 * 60 * 1000,
   MAX_POST_MEDIA: 50 * 1024 * 1024,
   MAX_STORY_MEDIA: 30 * 1024 * 1024,
-  MAX_AVATAR: 3 * 1024 * 1024
+  MAX_AVATAR: 3 * 1024 * 1024,
+  AUDIO_ONLINE_APP_NAME: 'NdooHlccPost'
 });
 
 let db = null;
